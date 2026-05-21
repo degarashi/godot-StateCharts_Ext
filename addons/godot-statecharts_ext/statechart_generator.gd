@@ -49,7 +49,7 @@ static func generate_script(class_name_str: String, events: Array, params: Array
 	lines.append("class Event:")
 	lines.append("\textends StateChartExt.Event")
 	if events.is_empty():
-		lines.append("\tpass")
+		pass
 	else:
 		for ev in events:
 			if not ev.comment.is_empty():
@@ -61,7 +61,7 @@ static func generate_script(class_name_str: String, events: Array, params: Array
 	lines.append("class Param:")
 	lines.append("\textends StateChartExt.Param")
 	if params.is_empty():
-		lines.append("\tpass")
+		pass
 	else:
 		for p in params:
 			if not p.comment.is_empty():
