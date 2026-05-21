@@ -1,0 +1,3 @@
+[submodule "asub/godot-statecharts"]
+	path = asub/godot-statecharts
+	url = https://github.com/derkork/godot-statecharts

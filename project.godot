@@ -13,6 +13,10 @@ config_version=5
 config/name="godot-StateCharts_Ext"
 config/features=PackedStringArray("4.6", "GL Compatibility")
 
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/godot_state_charts/plugin.cfg")
+
 [physics]
 
 3d/physics_engine="Jolt Physics"
