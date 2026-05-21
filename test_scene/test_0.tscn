@@ -1,0 +1,42 @@
+[gd_scene format=3 uid="uid://do6b0xu7wnny0"]
+
+[ext_resource type="Script" uid="uid://devull4oxu414" path="res://test_scene/test_driver.gd" id="1_driver"]
+[ext_resource type="Script" uid="uid://dixum303kfne4" path="res://test_scene/test_player_sc.gd" id="2_player_sc"]
+[ext_resource type="Script" uid="uid://jk2jm1g6q853" path="res://addons/godot_state_charts/compound_state.gd" id="3_compound"]
+[ext_resource type="Script" uid="uid://cytafq8i1y8qm" path="res://addons/godot_state_charts/atomic_state.gd" id="4_atomic"]
+[ext_resource type="Script" uid="uid://cf1nsco3w0mf6" path="res://addons/godot_state_charts/transition.gd" id="5_transition"]
+
+[node name="Test0" type="Node2D" unique_id=1633708888]
+script = ExtResource("1_driver")
+
+[node name="TestPlayerSC" type="Node" parent="." unique_id=1593524453]
+unique_name_in_owner = true
+script = ExtResource("2_player_sc")
+
+[node name="Root" type="Node" parent="TestPlayerSC" unique_id=1097750222]
+script = ExtResource("3_compound")
+initial_state = NodePath("Idle")
+
+[node name="Idle" type="Node" parent="TestPlayerSC/Root" unique_id=1266501081]
+script = ExtResource("4_atomic")
+
+[node name="ToMove" type="Node" parent="TestPlayerSC/Root/Idle" unique_id=2078257738]
+script = ExtResource("5_transition")
+to = NodePath("../../Move")
+event = &"move"
+delay_in_seconds = "0.0"
+
+[node name="OnHealthChanged" type="Node" parent="TestPlayerSC/Root/Idle" unique_id=484878428]
+script = ExtResource("5_transition")
+to = NodePath("..")
+event = &"health_changed"
+delay_in_seconds = "0.0"
+
+[node name="Move" type="Node" parent="TestPlayerSC/Root" unique_id=2081360102]
+script = ExtResource("4_atomic")
+
+[node name="ToIdle" type="Node" parent="TestPlayerSC/Root/Move" unique_id=1068063174]
+script = ExtResource("5_transition")
+to = NodePath("../../Idle")
+event = &"stop"
+delay_in_seconds = "0.0"
