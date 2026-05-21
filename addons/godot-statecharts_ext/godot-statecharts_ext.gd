@@ -3,10 +3,15 @@ extends EditorPlugin
 
 const CAT = "ScExt_Gen"
 var _fs_reloading := false
+var _import_plugin: RefCounted
 
 
 func _enter_tree() -> void:
 	DLogger.info("Plugin enabled.", [], CAT)
+
+	_import_plugin = preload("scdef_import_plugin.gd").new()
+	add_import_plugin(_import_plugin)
+
 	var fs := EditorInterface.get_resource_filesystem()
 	fs.filesystem_changed.connect(_on_filesystem_changed)
 	if fs.has_signal("sources_changed"):
@@ -21,6 +26,20 @@ func _enter_tree() -> void:
 
 func _on_sources_changed(_exist: bool) -> void:
 	_on_filesystem_changed()
+
+
+func _exit_tree() -> void:
+	if _import_plugin:
+		remove_import_plugin(_import_plugin)
+		_import_plugin = null
+
+	remove_tool_menu_item("StateChartExt: Force Regenerate all .scdef")
+
+	var fs := EditorInterface.get_resource_filesystem()
+	if fs.filesystem_changed.is_connected(_on_filesystem_changed):
+		fs.filesystem_changed.disconnect(_on_filesystem_changed)
+	if fs.has_signal("sources_changed") and fs.sources_changed.is_connected(_on_sources_changed):
+		fs.sources_changed.disconnect(_on_sources_changed)
 
 
 func _manual_scan() -> void:
