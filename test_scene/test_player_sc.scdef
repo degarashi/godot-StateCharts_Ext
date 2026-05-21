@@ -1,0 +1,8 @@
+class TestPlayerSC
+
+event move
+event stop
+event health_changed
+
+param health float { health_changed: true }
+param speed float
