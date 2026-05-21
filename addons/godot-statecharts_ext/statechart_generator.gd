@@ -64,49 +64,71 @@ static func generate_script(class_name_str: String, events: Array, params: Array
 	return "\n".join(lines)
 
 
+## Parses scdef text and returns a Dictionary with "code" (String) and "error" (String, empty if OK).
 static func parse_and_generate(
 	text: String, fallback_name: String = "GeneratedStateChart"
-) -> String:
+) -> Dictionary:
 	var lines = text.split("\n")
 	var class_name_str = fallback_name
 	var events = []
 	var params = []
+	var error_msg = ""
 
-	for line in lines:
-		line = line.strip_edges()
+	for i in range(lines.size()):
+		var raw_line = lines[i]
+		var line = raw_line.strip_edges()
 		if line.is_empty() or line.begins_with("#"):
 			continue
 
 		var parts = line.split(" ", false)
 		if parts.size() < 2:
-			continue
+			error_msg = "Line %d: Invalid syntax. Expected 'command name'." % (i + 1)
+			break
 
 		var cmd = parts[0].to_lower()
+		var name = parts[1]
+
 		if cmd == "class":
-			class_name_str = parts[1]
+			class_name_str = name
 		elif cmd == "event":
-			events.append(parts[1])
+			events.append(name)
 		elif cmd == "param":
-			var p_name = parts[1]
 			var p_type = "variant"
 			if parts.size() >= 3:
 				p_type = parts[2].to_lower()
 
+			if not p_type in TYPE_MAP:
+				error_msg = "Line %d: Unknown type '%s'." % [i + 1, p_type]
+				break
+
 			var notify = {}
-			# Check for notify map { event: true, ... }
 			var brace_start = line.find("{")
 			if brace_start != -1:
 				var brace_end = line.find("}", brace_start)
-				if brace_end != -1:
-					var dict_content = line.substr(brace_start + 1, brace_end - brace_start - 1)
-					var pairs = dict_content.split(",", false)
-					for pair in pairs:
-						var kv = pair.split(":", false)
-						if kv.size() == 2:
-							var k = kv[0].strip_edges()
-							var v = kv[1].strip_edges().to_lower() == "true"
-							notify[k] = v
+				if brace_end == -1:
+					error_msg = "Line %d: Missing closing brace '}'." % (i + 1)
+					break
 
-			params.append({"name": p_name, "type": p_type, "notify": notify})
+				var dict_content = line.substr(brace_start + 1, brace_end - brace_start - 1)
+				var pairs = dict_content.split(",", false)
+				for pair in pairs:
+					var kv = pair.split(":", false)
+					if kv.size() == 2:
+						var k = kv[0].strip_edges()
+						var v = kv[1].strip_edges().to_lower() == "true"
+						notify[k] = v
+					else:
+						error_msg = "Line %d: Invalid notification map syntax." % (i + 1)
+						break
+				if not error_msg.is_empty():
+					break
 
-	return generate_script(class_name_str, events, params)
+			params.append({"name": name, "type": p_type, "notify": notify})
+		else:
+			error_msg = "Line %d: Unknown command '%s'." % [i + 1, cmd]
+			break
+
+	if not error_msg.is_empty():
+		return {"code": "", "error": error_msg}
+
+	return {"code": generate_script(class_name_str, events, params), "error": ""}

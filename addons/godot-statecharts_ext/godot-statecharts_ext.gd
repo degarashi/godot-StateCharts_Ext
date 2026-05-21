@@ -84,7 +84,13 @@ func _process_scdef_file(scdef_path: String) -> void:
 			f_gd.close()
 
 	var fallback_name = scdef_path.get_file().get_basename().to_pascal_case() + "SC"
-	var generated_code = StateChartGenerator.parse_and_generate(content, fallback_name)
+	var result = StateChartGenerator.parse_and_generate(content, fallback_name)
+
+	if not result.error.is_empty():
+		DLogger.error("Syntax error in {0}:\n{1}", [scdef_path, result.error], CAT)
+		return
+
+	var generated_code = result.code
 
 	if generated_code != old_content:
 		var f_out = FileAccess.open(gd_path, FileAccess.WRITE)
