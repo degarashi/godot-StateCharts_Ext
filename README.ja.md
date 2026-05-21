@@ -16,14 +16,33 @@
 
 ## インストール方法
 
-1. [godot-statecharts](https://github.com/derkork/godot-statecharts) がプロジェクトにインストールされ、有効化されていることを確認する。
-2. `addons/godot-statecharts_ext` フォルダをプロジェクトの `addons/` ディレクトリにコピーする。
-3. **プロジェクト設定 > プラグイン** から "Godot StateCharts Extension" を有効にする。
+- [godot-statecharts](https://github.com/derkork/godot-statecharts) がプロジェクトにインストールされ、有効化されていることを確認する。
+- `addons/godot-statecharts_ext` フォルダをプロジェクトの `addons/` ディレクトリにコピーする。
+- **プロジェクト設定 > プラグイン** から "Godot StateCharts Extension" を有効にする。
 
 ## 使い方ガイド
 
-### 1. StateChart の定義
+### StateChart の定義 (新機能: 自動生成)
 
+シンプルなテキスト形式の定義ファイル (`.scdef`) を使用して、GDScript のボイラープレートを自動生成できるようになった。
+
+`player.scdef` という名前でファイルを作成する：
+```text
+class PlayerSC
+
+event jump
+event crouch
+event health_changed
+
+param health float { health_changed: true }
+param ammo int
+```
+
+このファイルを保存すると、プラグインが自動的に `player.gd` を生成・更新する。その後、この `player.gd` を StateChart ノードにアタッチするだけで利用可能になる。
+
+---
+
+### 代替方法：手動での定義
 `StateChartExt` を継承した新しいスクリプトを作成し、インナークラス内でイベントとパラメータを定義する。
 
 ```gdscript
@@ -49,11 +68,11 @@ func get_sc_info() -> SCInfo:
     return SCInfo.new(Param, Event)
 ```
 
-### 2. ノードの配置と設定
+### ノードの配置と設定
 
 シーン内のノードに作成したスクリプトをアタッチする（標準の `StateChart` ノードの代わりに使用する）。プラグインが自動的に定義をスキャンする。
 
-### 3. コードからのアクセス
+### コードからのアクセス
 
 `e` (events) と `p` (parameters) プロキシを使用して、クリーンな API で操作する。
 
@@ -75,7 +94,7 @@ func take_damage(amount: float):
         sc.e.die.call()
 ```
 
-### 4. ローカルパラメータ
+### ローカルパラメータ
 
 特定のステートがアクティブな間だけ存在するパラメータを設定する。
 

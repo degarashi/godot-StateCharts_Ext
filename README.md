@@ -16,14 +16,33 @@ This extension provides a statically typed wrapper to make state machine paramet
 
 ## Installation
 
-1. Ensure you have [godot-statecharts](https://github.com/derkork/godot-statecharts) installed and enabled in your project.
-2. Copy the `addons/godot-statecharts_ext` folder into your project's `addons/` directory.
-3. Enable the "Godot StateCharts Extension" plugin in **Project Settings > Plugins**.
+- Ensure you have [godot-statecharts](https://github.com/derkork/godot-statecharts) installed and enabled in your project.
+- Copy the `addons/godot-statecharts_ext` folder into your project's `addons/` directory.
+- Enable the "Godot StateCharts Extension" plugin in **Project Settings > Plugins**.
 
 ## Usage Guide
 
-### 1. Define your StateChart
+### Define your StateChart (New: Auto-generation)
 
+You can now use a simple text-based definition file (`.scdef`) to automatically generate the GDScript boilerplate.
+
+Create a file named `player.scdef`:
+```text
+class PlayerSC
+
+event jump
+event crouch
+event health_changed
+
+param health float { health_changed: true }
+param ammo int
+```
+
+When you save this file, the plugin will automatically generate/update `player.gd`. You can then attach this `player.gd` to your StateChart node.
+
+---
+
+### Alternative: Manual Definition
 Create a new script that extends `StateChartExt`. Define your events and parameters inside inner classes:
 
 ```gdscript
@@ -49,11 +68,11 @@ func get_sc_info() -> SCInfo:
     return SCInfo.new(Param, Event)
 ```
 
-### 2. Attach and Configure
+### Attach and Configure
 
 Attach your script to a node in your scene (replacing the standard `StateChart` node). The extension will automatically discover your definitions.
 
-### 3. Access in Code
+### Access in Code
 
 Use the `e` (events) and `p` (parameters) proxies for a clean API:
 
@@ -75,7 +94,7 @@ func take_damage(amount: float):
         sc.e.die.call()
 ```
 
-### 4. Local Parameters
+### Local Parameters
 
 Set parameters that exist only as long as a state is active:
 
