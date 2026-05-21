@@ -1,0 +1,96 @@
+# Godot StateCharts Extension (StateChartExt)
+
+A Godot plugin that extends the [godot-statecharts](https://github.com/derkork/godot-statecharts) library.
+This extension provides a statically typed wrapper to make state machine parameters and events safer, more discoverable, and easier to use through proxy objects.
+
+## Features
+
+- **Static Type Safety**: Define your events and parameters as static variables in inner classes for IDE completion and compile-time checks.
+- **Proxy-based API**: 
+    - `sc.e.event_name.call()`: Dispatch events with a clean, functional syntax.
+    - `sc.p.param_name = value`: Access and modify parameters directly with automatic type checking.
+- **Auto-Notifications**: Parameters can automatically trigger events when their values change.
+- **State-Local Parameters**: Easily manage parameters that are automatically cleaned up when leaving a specific state.
+- **Editor Integration**: Validation logic that provides configuration warnings in the Godot editor if names or types don't match.
+- **Logging Integration**: Built-in support for detailed diagnostic logging (compatible with `DLogger`).
+
+## Installation
+
+1. Ensure you have [godot-statecharts](https://github.com/derkork/godot-statecharts) installed and enabled in your project.
+2. Copy the `addons/godot-statecharts_ext` folder into your project's `addons/` directory.
+3. Enable the "Godot StateCharts Extension" plugin in **Project Settings > Plugins**.
+
+## Usage Guide
+
+### 1. Define your StateChart
+
+Create a new script that extends `StateChartExt`. Define your events and parameters inside inner classes:
+
+```gdscript
+@tool
+class_name PlayerSC extends StateChartExt
+
+# Define Events
+class Event:
+    extends StateChartExt.Event
+    static var jump := e()
+    static var attack := e()
+    static var health_changed := e()
+
+# Define Parameters
+class Param:
+    extends StateChartExt.Param
+    # health triggers 'health_changed' event only when the value actually changes
+    static var health := p(TYPE_FLOAT, { PlayerSC.Event.health_changed: true })
+    static var speed := p(TYPE_FLOAT)
+
+# Link them to the StateChart
+func get_sc_info() -> SCInfo:
+    return SCInfo.new(Param, Event)
+```
+
+### 2. Attach and Configure
+
+Attach your script to a node in your scene (replacing the standard `StateChart` node). The extension will automatically discover your definitions.
+
+### 3. Access in Code
+
+Use the `e` (events) and `p` (parameters) proxies for a clean API:
+
+```gdscript
+@onready var sc: PlayerSC = $StateChart
+
+func _ready():
+    # Set a parameter (triggers auto-events)
+    sc.p.health = 100.0
+    
+    # Safe check before access
+    if sc.p.has("speed"):
+        print(sc.p.speed)
+
+func take_damage(amount: float):
+    sc.p.health -= amount
+    if sc.p.health <= 0:
+        # Dispatch an event using .call()
+        sc.e.die.call()
+```
+
+### 4. Local Parameters
+
+Set parameters that exist only as long as a state is active:
+
+```gdscript
+# These will be automatically erased from the StateChart when exiting the current state
+sc.local().set_param(PlayerSC.Param.speed, 10.0)
+```
+
+## Safety Notice (GDScript 2.0 Proxies)
+
+Due to how Godot 4 handles dynamic property access:
+- Use `sc.e.event_name.call()` for event dispatching.
+- Use `sc.p.has("param_name")` if you are unsure if a parameter is currently registered (e.g., local parameters).
+- Accessing a non-existent property on a proxy directly will result in a runtime error.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
