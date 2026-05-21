@@ -32,7 +32,9 @@ static func generate_script(class_name_str: String, events: Array, params: Array
 		lines.append("\tpass")
 	else:
 		for ev in events:
-			lines.append("\tstatic var %s := e()" % ev)
+			if not ev.comment.is_empty():
+				lines.append("\t## %s" % ev.comment)
+			lines.append("\tstatic var %s := e()" % ev.name)
 	lines.append("")
 
 	# Param class
@@ -42,6 +44,8 @@ static func generate_script(class_name_str: String, events: Array, params: Array
 		lines.append("\tpass")
 	else:
 		for p in params:
+			if not p.comment.is_empty():
+				lines.append("\t## %s" % p.comment)
 			var type_str: String = TYPE_MAP.get(p.type, "TYPE_NIL")
 			var notify_str := ""
 			if not p.notify.is_empty():
@@ -70,28 +74,46 @@ static func parse_and_generate(
 ) -> Dictionary:
 	var lines := text.split("\n")
 	var class_name_str := fallback_name
-	var events: Array[String] = []
+	var events: Array[Dictionary] = []
 	var params: Array[Dictionary] = []
 	var error_msg := ""
+	var pending_comments: Array[String] = []
 
 	for i in range(lines.size()):
-		var raw_line := lines[i]
-		var line := raw_line.strip_edges()
-		if line.is_empty() or line.begins_with("#"):
+		var raw_line := lines[i].strip_edges()
+
+		# Collect documentation comments
+		if raw_line.begins_with("##"):
+			pending_comments.append(raw_line.substr(2).strip_edges())
 			continue
 
-		var parts := line.split(" ", false)
+		# Regular comments or empty lines break the doc-comment block
+		if raw_line.begins_with("#") or raw_line.is_empty():
+			pending_comments.clear()
+			continue
+
+		# Parse command line
+		var comment_start := raw_line.find("##")
+		var line_content := raw_line
+		if comment_start != -1:
+			var inline_comment := raw_line.substr(comment_start + 2).strip_edges()
+			pending_comments.append(inline_comment)
+			line_content = raw_line.substr(0, comment_start).strip_edges()
+
+		var parts := line_content.split(" ", false)
 		if parts.size() < 2:
 			error_msg = "Line %d: Invalid syntax. Expected 'command name'." % (i + 1)
 			break
 
 		var cmd := parts[0].to_lower()
 		var name := parts[1]
+		var final_comment := "\n\t## ".join(pending_comments)
+		pending_comments.clear()
 
 		if cmd == "class":
 			class_name_str = name
 		elif cmd == "event":
-			events.append(name)
+			events.append({"name": name, "comment": final_comment})
 		elif cmd == "param":
 			var p_type := "variant"
 			if parts.size() >= 3:
@@ -102,14 +124,16 @@ static func parse_and_generate(
 				break
 
 			var notify: Dictionary[String, bool] = {}
-			var brace_start := line.find("{")
+			var brace_start := line_content.find("{")
 			if brace_start != -1:
-				var brace_end := line.find("}", brace_start)
+				var brace_end := line_content.find("}", brace_start)
 				if brace_end == -1:
 					error_msg = "Line %d: Missing closing brace '}'." % (i + 1)
 					break
 
-				var dict_content := line.substr(brace_start + 1, brace_end - brace_start - 1)
+				var dict_content := line_content.substr(
+					brace_start + 1, brace_end - brace_start - 1
+				)
 				var pairs := dict_content.split(",", false)
 				for pair in pairs:
 					var kv := pair.split(":", false)
@@ -123,7 +147,9 @@ static func parse_and_generate(
 				if not error_msg.is_empty():
 					break
 
-			params.append({"name": name, "type": p_type, "notify": notify})
+			params.append(
+				{"name": name, "type": p_type, "notify": notify, "comment": final_comment}
+			)
 		else:
 			error_msg = "Line %d: Unknown command '%s'." % [i + 1, cmd]
 			break
