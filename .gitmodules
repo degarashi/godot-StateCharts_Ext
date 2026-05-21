@@ -1,3 +1,6 @@
 [submodule "asub/godot-statecharts"]
 	path = asub/godot-statecharts
 	url = https://github.com/derkork/godot-statecharts
+[submodule "asub/d_logger"]
+	path = asub/d_logger
+	url = ../godot-D_Logger
