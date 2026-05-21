@@ -430,7 +430,7 @@ static func _init_and_get_entries(
 	var current_script := source
 
 	while true:
-		# 1. Check constants (sometimes e() / p() calls in static var result in constants or entries)
+		# Check constants (sometimes e() / p() calls in static var result in constants or entries)
 		var constants := current_script.get_script_constant_map()
 		for c_name in constants:
 			var val = constants[c_name]
@@ -438,7 +438,7 @@ static func _init_and_get_entries(
 				val.name = c_name
 				ret[c_name] = val
 
-		# 2. Check all properties (get_property_list on the script object itself)
+		# Check all properties (get_property_list on the script object itself)
 		for m in current_script.get_property_list():
 			# Skip obvious internal things
 			if m.name in ["script", "Built-in Script", "RefCounted", "Resource"]:
