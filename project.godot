@@ -15,7 +15,7 @@ config/features=PackedStringArray("4.6", "GL Compatibility")
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/godot_state_charts/plugin.cfg")
+enabled=PackedStringArray("res://addons/godot-statecharts_ext/plugin.cfg", "res://addons/godot_state_charts/plugin.cfg")
 
 [physics]
 
