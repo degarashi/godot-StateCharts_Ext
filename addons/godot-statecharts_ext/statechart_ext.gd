@@ -133,11 +133,11 @@ class NotifyEnt:
 		assert(is_instance_valid(event_a), "event_a must be a valid instance")
 		event = event_a
 		# Default: always send event
-		checker = func(_prev, _current): return true
+		checker = func(_prev: Variant, _current: Variant) -> bool: return true
 		if checker_a is bool:
 			if checker_a:
 				# Send event only when value changes
-				checker = func(prev, current): return prev != current
+				checker = func(prev: Variant, current: Variant) -> bool: return prev != current
 		else:
 			# Custom check function
 			checker = checker_a
@@ -188,7 +188,7 @@ static var _entries_cache: Dictionary = {}
 		exclude_warn_unknown_events = value
 		update_configuration_warnings()
 
-@export_tool_button("Check errors", "Callable") var check_errors_btn := check_errors
+@export_tool_button("Check errors", "Callable") var check_errors_btn: Callable = check_errors
 
 # ------------- [Public Variable] -------------
 ## Proxy for event dispatching (_st.e.event_name())
@@ -579,7 +579,7 @@ func _check_param_internal(
 
 func _check_expression(
 	dst: PackedStringArray, path: String, exp_str: String, param_def: Dictionary[String, int]
-):
+) -> void:
 	var params: Array[StringName] = []
 	for k in param_def.keys():
 		params.append(k)
@@ -745,7 +745,7 @@ func send_event_ext(event_ent: EventEnt) -> void:
 
 # ------------- [Override] -------------
 # Overridden to disable to prevent users from calling by mistake
-func set_expression_property(value_name: StringName, value) -> void:
+func set_expression_property(value_name: StringName, value: Variant) -> void:
 	assert(
 		false,
 		"set_expression_property({0}, {1}) called. Use the _ext version instead.".format(
@@ -775,7 +775,7 @@ class StateChartLocalProxy:
 	var _sc: StateChartExt
 	var _state: StateChartState
 
-	func _init(sc: StateChartExt, state: StateChartState):
+	func _init(sc: StateChartExt, state: StateChartState) -> void:
 		_sc = sc
 		_state = state
 
@@ -797,7 +797,7 @@ class EventProxy:
 	var _sc: StateChartExt
 	var _cache: Dictionary[String, EntBase]
 
-	func _init(sc: StateChartExt, event_script: Script):
+	func _init(sc: StateChartExt, event_script: Script) -> void:
 		_sc = sc
 		_cache = StateChartExt._init_and_get_entries(event_script, EventEnt)
 
@@ -822,14 +822,14 @@ class ParamProxy:
 	var _sc: StateChartExt
 	var _cache: Dictionary[String, EntBase]
 
-	func _init(sc: StateChartExt, param_script: Script):
+	func _init(sc: StateChartExt, param_script: Script) -> void:
 		_sc = sc
 		_cache = StateChartExt._init_and_get_entries(param_script, ParamEnt)
 
 	## Returns true if the parameter exists in the cache AND in the StateChart instance
 	func has(param_name: String) -> bool:
 		if param_name in _cache:
-			var ent = _cache[param_name] as ParamEnt
+			var ent := _cache[param_name] as ParamEnt
 			return _sc._expression_properties.has(ent.name)
 		return false
 

@@ -45,13 +45,13 @@ func _scan_and_generate() -> void:
 
 
 func _scan_dir_recursive(path: String) -> void:
-	var dir = DirAccess.open(path)
+	var dir := DirAccess.open(path)
 	if not dir:
 		DLogger.error("Could not open directory: {0}", [path], CAT)
 		return
 
 	dir.list_dir_begin()
-	var file_name = dir.get_next()
+	var file_name := dir.get_next()
 
 	while file_name != "":
 		if dir.current_is_dir():
@@ -59,7 +59,7 @@ func _scan_dir_recursive(path: String) -> void:
 				_scan_dir_recursive(path.path_join(file_name))
 		else:
 			if file_name.ends_with(".scdef"):
-				var full_path = path.path_join(file_name)
+				var full_path := path.path_join(file_name)
 				_process_scdef_file(full_path)
 
 		file_name = dir.get_next()
@@ -67,33 +67,33 @@ func _scan_dir_recursive(path: String) -> void:
 
 
 func _process_scdef_file(scdef_path: String) -> void:
-	var gd_path = scdef_path.get_basename() + ".gd"
+	var gd_path := scdef_path.get_basename() + ".gd"
 
-	var f_scdef = FileAccess.open(scdef_path, FileAccess.READ)
+	var f_scdef := FileAccess.open(scdef_path, FileAccess.READ)
 	if not f_scdef:
 		DLogger.error("Could not open scdef for reading: {0}", [scdef_path], CAT)
 		return
-	var content = f_scdef.get_as_text()
+	var content := f_scdef.get_as_text()
 	f_scdef.close()
 
-	var old_content = ""
+	var old_content := ""
 	if FileAccess.file_exists(gd_path):
-		var f_gd = FileAccess.open(gd_path, FileAccess.READ)
+		var f_gd := FileAccess.open(gd_path, FileAccess.READ)
 		if f_gd:
 			old_content = f_gd.get_as_text()
 			f_gd.close()
 
-	var fallback_name = scdef_path.get_file().get_basename().to_pascal_case() + "SC"
-	var result = StateChartGenerator.parse_and_generate(content, fallback_name)
+	var fallback_name := scdef_path.get_file().get_basename().to_pascal_case() + "SC"
+	var result := StateChartGenerator.parse_and_generate(content, fallback_name)
 
 	if not result.error.is_empty():
 		DLogger.error("Syntax error in {0}:\n{1}", [scdef_path, result.error], CAT)
 		return
 
-	var generated_code = result.code
+	var generated_code: String = result.code
 
 	if generated_code != old_content:
-		var f_out = FileAccess.open(gd_path, FileAccess.WRITE)
+		var f_out := FileAccess.open(gd_path, FileAccess.WRITE)
 		if f_out:
 			f_out.store_string(generated_code)
 			f_out.close()

@@ -8,7 +8,7 @@ class_name STAux
 static func _st_proc_value(
 	st: StateChartExt, param_ent: StateChartExt.ParamEnt, validator: Callable, proc: Callable
 ) -> void:
-	var v = st.get_expression_property_ext(param_ent)
+	var v := st.get_expression_property_ext(param_ent)
 	if not validator.call(v):
 		push_error("ERROR")
 		return
@@ -18,11 +18,11 @@ static func _st_proc_value(
 
 
 # --- Checkers ---
-static func _is_array(ar) -> bool:
+static func _is_array(ar: Variant) -> bool:
 	return ar is Array
 
 
-static func _is_dict(ar) -> bool:
+static func _is_dict(ar: Variant) -> bool:
 	return ar is Dictionary
 
 
@@ -49,21 +49,23 @@ static func st_init_array(st: StateChartExt, param_ent: StateChartExt.ParamEnt) 
 # --- Value Modification ---
 # [Dictionary]
 static func st_insert_dict(
-	st: StateChartExt, param_ent: StateChartExt.ParamEnt, key, value
+	st: StateChartExt, param_ent: StateChartExt.ParamEnt, key: Variant, value: Variant
 ) -> void:
 	_st_proc_value(st, param_ent, _is_dict, func(di: Dictionary) -> void: di[key] = value)
 
 
 # [Array]
-static func st_add_array(st: StateChartExt, param_ent: StateChartExt.ParamEnt, value) -> void:
+static func st_add_array(
+	st: StateChartExt, param_ent: StateChartExt.ParamEnt, value: Variant
+) -> void:
 	_st_proc_value(st, param_ent, _is_array, func(ar: Array) -> void: ar.append(value))
 
 
 # [int]
 static func st_add_value(
-	st: StateChartExt, param_ent: StateChartExt.ParamEnt, value_to_add
+	st: StateChartExt, param_ent: StateChartExt.ParamEnt, value_to_add: Variant
 ) -> Array:
-	var orig = st.get_expression_property_ext(param_ent)
+	var orig := st.get_expression_property_ext(param_ent)
 	var after = orig + value_to_add
 	st.set_expression_property_ext(param_ent, after)
 	return [orig, after]
