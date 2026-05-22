@@ -260,11 +260,47 @@ var _p_dyn: ParamProxy
 
 
 # ------------- [Callbacks] -------------
+func _get_property_list() -> Array[Dictionary]:
+	var properties: Array[Dictionary] = []
+	var sc_info := get_sc_info()
+	if sc_info == null:
+		return properties
+
+	var params := _init_and_get_entries(sc_info.param, ParamEnt)
+	if params.is_empty():
+		return properties
+
+	properties.append(
+		{
+			"name": "StateChart Parameters",
+			"type": TYPE_NIL,
+			"usage": PROPERTY_USAGE_GROUP,
+			"hint_string": "p/"
+		}
+	)
+
+	for p_name in params:
+		var ent := params[p_name] as ParamEnt
+		properties.append(
+			{"name": "p/" + p_name, "type": ent.type_id, "usage": PROPERTY_USAGE_EDITOR}
+		)
+
+	return properties
+
+
 func _get(property: StringName) -> Variant:
 	if property == &"e":
 		return _e_dyn
 	if property == &"p":
 		return _p_dyn
+
+	if property.begins_with("p/"):
+		var p_name := property.trim_prefix("p/")
+		var sc_info := get_sc_info()
+		if sc_info != null:
+			var params := _init_and_get_entries(sc_info.param, ParamEnt)
+			if p_name in params:
+				return get_expression_property_ext(params[p_name] as ParamEnt)
 	return null
 
 
@@ -275,6 +311,15 @@ func _set(property: StringName, value: Variant) -> bool:
 	if property == &"p":
 		_p_dyn = value
 		return true
+
+	if property.begins_with("p/"):
+		var p_name := property.trim_prefix("p/")
+		var sc_info := get_sc_info()
+		if sc_info != null:
+			var params := _init_and_get_entries(sc_info.param, ParamEnt)
+			if p_name in params:
+				set_expression_property_ext(params[p_name] as ParamEnt, value)
+				return true
 	return false
 
 
