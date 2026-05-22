@@ -5,16 +5,22 @@ extends RefCounted
 
 const EXT_NAMESPACE_PREFIX := "statechart_ext"
 const DELAY_ATTR_NAME := "%s:delay_in_seconds" % EXT_NAMESPACE_PREFIX
+const NAME_ATTR_NAME := "%s:name" % EXT_NAMESPACE_PREFIX
 
 
 class ParsedTransition:
+	var name: String
 	var event: StringName
 	var target_id: StringName
 	var delay_in_seconds: String
 
 	func _init(
-		event_a: StringName = &"", target_id_a: StringName = &"", delay_in_seconds_a: String = "0.0"
+		name_a: String = "Transition",
+		event_a: StringName = &"",
+		target_id_a: StringName = &"",
+		delay_in_seconds_a: String = "0.0"
 	) -> void:
+		name = name_a
 		event = event_a
 		target_id = target_id_a
 		delay_in_seconds = delay_in_seconds_a
@@ -132,6 +138,7 @@ func _parse_state_element(xml: XMLParser, element_name: String) -> ParsedState:
 				elif node_name == "transition":
 					parsed.transitions.append(
 						ParsedTransition.new(
+							_parse_transition_name(xml),
 							StringName(xml.get_named_attribute_value_safe("event")),
 							_parse_transition_target(xml.get_named_attribute_value_safe("target")),
 							_parse_transition_delay(xml)
@@ -142,6 +149,13 @@ func _parse_state_element(xml: XMLParser, element_name: String) -> ParsedState:
 					return parsed
 
 	return parsed
+
+
+func _parse_transition_name(xml: XMLParser) -> String:
+	var name_attr := xml.get_named_attribute_value_safe(NAME_ATTR_NAME)
+	if not name_attr.is_empty():
+		return name_attr
+	return "Transition"
 
 
 func _parse_transition_target(target_attr: String) -> StringName:
@@ -183,7 +197,7 @@ func _instantiate_state_tree(
 
 	for parsed_transition in parsed.transitions:
 		var transition := Transition.new()
-		transition.name = "Transition"
+		transition.name = parsed_transition.name
 		transition.event = parsed_transition.event
 		transition.delay_in_seconds = parsed_transition.delay_in_seconds
 		state_node.add_child(transition)

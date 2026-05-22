@@ -6,6 +6,7 @@ extends RefCounted
 const EXT_NAMESPACE_PREFIX := "statechart_ext"
 const EXT_NAMESPACE_URI := "https://github.com/degarashi/godot-statecharts_ext/scxml"
 const DELAY_ATTR_NAME := "%s:delay_in_seconds" % EXT_NAMESPACE_PREFIX
+const NAME_ATTR_NAME := "%s:name" % EXT_NAMESPACE_PREFIX
 
 
 ## Exports the state chart to an SCXML string
@@ -72,6 +73,7 @@ func _export_transition(node: Transition, lines: Array[String], indent: int) -> 
 	attrs.append('event="%s"' % _escape_attr(String(node.event)))
 	attrs.append('target="%s"' % _escape_attr(target))
 	attrs.append('%s="%s"' % [DELAY_ATTR_NAME, _escape_attr(node.delay_in_seconds)])
+	attrs.append('%s="%s"' % [NAME_ATTR_NAME, _escape_attr(node.name)])
 	lines.append("{s}<transition {attrs}/>".format({"s": spacing, "attrs": " ".join(attrs)}))
 
 
