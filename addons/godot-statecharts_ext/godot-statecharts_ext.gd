@@ -4,7 +4,7 @@
 extends EditorPlugin
 
 # ------------- [Constants] -------------
-const CAT := "ScExt_Gen"
+const CAT = "ScExt_Gen"
 
 # ------------- [Private Variables] -------------
 var _fs_reloading := false
@@ -12,7 +12,7 @@ var _import_plugin: RefCounted
 var _inspector_plugin: EditorInspectorPlugin
 
 
-# ------------- [Callbacks] -------------
+# ------------- [Lifecycle Methods] -------------
 func _enter_tree() -> void:
 	DLogger.info("Plugin enabled.", [], CAT)
 
@@ -34,22 +34,6 @@ func _enter_tree() -> void:
 	timer.timeout.connect(_on_filesystem_changed)
 
 
-func _register_inspector_delayed() -> void:
-	# Wait 1 frame until the scene tree is ready
-	if not is_inside_tree():
-		await tree_entered
-	await get_tree().process_frame
-
-	# If an existing plugin exists, remove it first before registering
-	if _inspector_plugin:
-		remove_inspector_plugin(_inspector_plugin)
-		_inspector_plugin = null
-
-	_inspector_plugin = preload("transition_inspector_plugin.gd").new()
-	add_inspector_plugin(_inspector_plugin)
-	DLogger.info("Transition Inspector Plugin registered safely.", [], CAT)
-
-
 func _exit_tree() -> void:
 	if _import_plugin:
 		remove_import_plugin(_import_plugin)
@@ -68,10 +52,7 @@ func _exit_tree() -> void:
 		fs.sources_changed.disconnect(_on_sources_changed)
 
 
-func _on_sources_changed(_exist: bool) -> void:
-	_on_filesystem_changed()
-
-
+# ------------- [Callbacks] -------------
 func _on_filesystem_changed() -> void:
 	if _fs_reloading:
 		return
@@ -82,12 +63,67 @@ func _on_filesystem_changed() -> void:
 	_fs_reloading = false
 
 
+func _on_sources_changed(_exist: bool) -> void:
+	_on_filesystem_changed()
+
+
 # ------------- [Private Methods] -------------
 func _manual_scan() -> void:
 	DLogger.info("Manual scan started...", [], CAT)
 	EditorInterface.get_resource_filesystem().scan()
 	_scan_and_generate()
 	DLogger.info("Manual scan finished.", [], CAT)
+
+
+func _process_scdef_file(scdef_path: String) -> void:
+	var gd_path := scdef_path.get_basename() + ".gd"
+
+	var f_scdef := FileAccess.open(scdef_path, FileAccess.READ)
+	if not f_scdef:
+		DLogger.error("Could not open scdef for reading: {0}", [scdef_path], CAT)
+		return
+	var content := f_scdef.get_as_text()
+	f_scdef.close()
+
+	var old_content := ""
+	if FileAccess.file_exists(gd_path):
+		var f_gd := FileAccess.open(gd_path, FileAccess.READ)
+		if f_gd:
+			old_content = f_gd.get_as_text()
+			f_gd.close()
+
+	var fallback_name := scdef_path.get_file().get_basename().to_pascal_case() + "SC"
+	var result := StateChartGenerator.parse_and_generate(content, fallback_name)
+
+	if not result.error.is_empty():
+		DLogger.error("Syntax error in {0}:\n{1}", [scdef_path, result.error], CAT)
+		return
+
+	var generated_code: String = result.code
+
+	if generated_code != old_content:
+		var f_out := FileAccess.open(gd_path, FileAccess.WRITE)
+		if f_out:
+			f_out.store_string(generated_code)
+			f_out.close()
+			DLogger.info("Generated: {0}", [gd_path], CAT)
+			EditorInterface.get_resource_filesystem().update_file(gd_path)
+		else:
+			DLogger.error("Could not open gd for writing: {0}".format([gd_path]), [], CAT)
+
+
+func _register_inspector_delayed() -> void:
+	if not is_inside_tree():
+		await tree_entered
+	await get_tree().process_frame
+
+	if _inspector_plugin:
+		remove_inspector_plugin(_inspector_plugin)
+		_inspector_plugin = null
+
+	_inspector_plugin = preload("transition_inspector_plugin.gd").new()
+	add_inspector_plugin(_inspector_plugin)
+	DLogger.info("Transition Inspector Plugin registered safely.", [], CAT)
 
 
 func _scan_and_generate() -> void:
@@ -97,7 +133,7 @@ func _scan_and_generate() -> void:
 func _scan_dir_recursive(path: String) -> void:
 	var dir := DirAccess.open(path)
 	if not dir:
-		DLogger.error("Could not open directory: {0}", [path], CAT)
+		DLogger.error("Could not open directory: {0}".format([path]), [], CAT)
 		return
 
 	dir.list_dir_begin()
@@ -114,40 +150,3 @@ func _scan_dir_recursive(path: String) -> void:
 
 		file_name = dir.get_next()
 	dir.list_dir_end()
-
-
-func _process_scdef_file(scdef_path: String) -> void:
-	var gd_path := scdef_path.get_basename() + ".gd"
-
-	var f_scdef := FileAccess.open(scdef_path, FileAccess.READ)
-	if not f_scdef:
-		DLogger.error("Could not open scdef for reading: {0}", [scdef_path], CAT)
-		return
-	var content: String = f_scdef.get_as_text()
-	f_scdef.close()
-
-	var old_content := ""
-	if FileAccess.file_exists(gd_path):
-		var f_gd := FileAccess.open(gd_path, FileAccess.READ)
-		if f_gd:
-			old_content = f_gd.get_as_text()
-			f_gd.close()
-
-	var fallback_name := scdef_path.get_file().get_basename().to_pascal_case() + "SC"
-	var result: Dictionary = StateChartGenerator.parse_and_generate(content, fallback_name)
-
-	if not result.error.is_empty():
-		DLogger.error("Syntax error in {0}:\n{1}", [scdef_path, result.error], CAT)
-		return
-
-	var generated_code: String = result.code
-
-	if generated_code != old_content:
-		var f_out := FileAccess.open(gd_path, FileAccess.WRITE)
-		if f_out:
-			f_out.store_string(generated_code)
-			f_out.close()
-			DLogger.info("Generated: {0}", [gd_path], CAT)
-			EditorInterface.get_resource_filesystem().update_file(gd_path)
-		else:
-			DLogger.error("Could not open gd for writing: {0}", [gd_path], CAT)
