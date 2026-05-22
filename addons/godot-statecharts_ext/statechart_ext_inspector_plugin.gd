@@ -1,0 +1,32 @@
+@tool
+extends EditorInspectorPlugin
+
+const StateChartExtScript := preload("statechart_ext.gd")
+
+var _plugin: EditorPlugin
+
+
+func _init(plugin: EditorPlugin) -> void:
+	_plugin = plugin
+
+
+func _can_handle(object: Object) -> bool:
+	return object is StateChartExtScript
+
+
+func _parse_begin(object: Object) -> void:
+	var btn_export := Button.new()
+	btn_export.text = "Export to SCXML..."
+	btn_export.icon = _plugin.get_editor_interface().get_base_control().get_theme_icon(
+		"Save", "EditorIcons"
+	)
+	btn_export.pressed.connect(_plugin._manual_export_scxml)
+	add_custom_control(btn_export)
+
+	var btn_import := Button.new()
+	btn_import.text = "Import SCXML..."
+	btn_import.icon = _plugin.get_editor_interface().get_base_control().get_theme_icon(
+		"Load", "EditorIcons"
+	)
+	btn_import.pressed.connect(_plugin._manual_import_scxml)
+	add_custom_control(btn_import)

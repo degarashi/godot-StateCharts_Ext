@@ -10,7 +10,8 @@ const CAT = "ScExt_Gen"
 # ------------- [Private Variables] -------------
 var _fs_reloading := false
 var _import_plugin: RefCounted
-var _inspector_plugin: EditorInspectorPlugin
+var _transition_inspector_plugin: EditorInspectorPlugin
+var _statechart_ext_inspector_plugin: EditorInspectorPlugin
 
 
 # ------------- [Lifecycle Methods] -------------
@@ -21,7 +22,7 @@ func _enter_tree() -> void:
 	add_import_plugin(_import_plugin)
 
 	# Wait for the editor to be fully ready before registration
-	_register_inspector_delayed()
+	_register_inspectors_delayed()
 
 	var fs := EditorInterface.get_resource_filesystem()
 	fs.filesystem_changed.connect(_on_filesystem_changed)
@@ -42,9 +43,13 @@ func _exit_tree() -> void:
 		remove_import_plugin(_import_plugin)
 		_import_plugin = null
 
-	if _inspector_plugin:
-		remove_inspector_plugin(_inspector_plugin)
-		_inspector_plugin = null
+	if _transition_inspector_plugin:
+		remove_inspector_plugin(_transition_inspector_plugin)
+		_transition_inspector_plugin = null
+
+	if _statechart_ext_inspector_plugin:
+		remove_inspector_plugin(_statechart_ext_inspector_plugin)
+		_statechart_ext_inspector_plugin = null
 
 	remove_tool_menu_item("StateChartExt: Force Regenerate all .scdef")
 	remove_tool_menu_item("StateChartExt: Export current StateChart as SCXML")
@@ -82,6 +87,7 @@ func _manual_scan() -> void:
 
 var _scxml_export_dialog: EditorFileDialog
 var _scxml_import_dialog: EditorFileDialog
+
 
 func _manual_export_scxml() -> void:
 	var selected_nodes := EditorInterface.get_selection().get_selected_nodes()
@@ -143,7 +149,6 @@ func _on_scxml_import_file_selected(path: String) -> void:
 		DLogger.error("Failed to import SCXML: {0}", [err], CAT)
 
 
-
 func _process_scdef_file(scdef_path: String) -> void:
 	var gd_path := scdef_path.get_basename() + ".gd"
 
@@ -181,18 +186,26 @@ func _process_scdef_file(scdef_path: String) -> void:
 			DLogger.error("Could not open gd for writing: {0}".format([gd_path]), [], CAT)
 
 
-func _register_inspector_delayed() -> void:
+func _register_inspectors_delayed() -> void:
 	if not is_inside_tree():
 		await tree_entered
 	await get_tree().process_frame
 
-	if _inspector_plugin:
-		remove_inspector_plugin(_inspector_plugin)
-		_inspector_plugin = null
+	if _transition_inspector_plugin:
+		remove_inspector_plugin(_transition_inspector_plugin)
+		_transition_inspector_plugin = null
 
-	_inspector_plugin = preload("transition_inspector_plugin.gd").new()
-	add_inspector_plugin(_inspector_plugin)
-	DLogger.info("Transition Inspector Plugin registered safely.", [], CAT)
+	if _statechart_ext_inspector_plugin:
+		remove_inspector_plugin(_statechart_ext_inspector_plugin)
+		_statechart_ext_inspector_plugin = null
+
+	_transition_inspector_plugin = preload("transition_inspector_plugin.gd").new()
+	add_inspector_plugin(_transition_inspector_plugin)
+
+	_statechart_ext_inspector_plugin = preload("statechart_ext_inspector_plugin.gd").new(self)
+	add_inspector_plugin(_statechart_ext_inspector_plugin)
+
+	DLogger.info("Inspector Plugins registered safely.", [], CAT)
 
 
 func _scan_and_generate() -> void:
