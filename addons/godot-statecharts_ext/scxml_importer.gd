@@ -9,7 +9,9 @@ const NAME_ATTR_NAME := "%s:name" % EXT_NAMESPACE_PREFIX
 const GUARD_JSON_ATTR_NAME := "%s:guard_json" % EXT_NAMESPACE_PREFIX
 
 const ExpressionGuardScript := preload("res://addons/godot_state_charts/expression_guard.gd")
-const StateIsActiveGuardScript := preload("res://addons/godot_state_charts/state_is_active_guard.gd")
+const StateIsActiveGuardScript := preload(
+	"res://addons/godot_state_charts/state_is_active_guard.gd"
+)
 const NotGuardScript := preload("res://addons/godot_state_charts/not_guard.gd")
 const AllOfGuardScript := preload("res://addons/godot_state_charts/all_of_guard.gd")
 const AnyOfGuardScript := preload("res://addons/godot_state_charts/any_of_guard.gd")
@@ -199,8 +201,97 @@ func _parse_transition_guard_ast(xml: XMLParser) -> Dictionary:
 
 	var cond := xml.get_named_attribute_value_safe("cond")
 	if not cond.is_empty():
-		return {"type": "expression", "expression": cond}
+		return _cond_to_ast(cond)
 	return {}
+
+
+func _cond_to_ast(cond: String) -> Dictionary:
+	cond = cond.strip_edges()
+	if cond.is_empty():
+		return {}
+
+	# Handle top-level AND
+	var parts_and := _split_top_level(cond, " && ")
+	if parts_and.size() > 1:
+		var guards: Array = []
+		for p in parts_and:
+			var ast := _cond_to_ast(_unwrap_parens(p))
+			if not ast.is_empty():
+				guards.append(ast)
+		return {"type": "all_of", "guards": guards}
+
+	# Handle top-level OR
+	var parts_or := _split_top_level(cond, " || ")
+	if parts_or.size() > 1:
+		var guards: Array = []
+		for p in parts_or:
+			var ast := _cond_to_ast(_unwrap_parens(p))
+			if not ast.is_empty():
+				guards.append(ast)
+		return {"type": "any_of", "guards": guards}
+
+	# Handle NOT
+	if cond.begins_with("!") and cond.ends_with(")"):
+		var first_paren := cond.find("(")
+		if first_paren == 1:
+			var inner := cond.substr(first_paren + 1, cond.length() - first_paren - 2)
+			if _is_balanced(inner):
+				return {"type": "not", "guard": _cond_to_ast(inner)}
+
+	# Handle In('...')
+	if cond.begins_with("In('") and cond.ends_with("')"):
+		var state_id := cond.substr(4, cond.length() - 6)
+		return {"type": "state_is_active", "state": state_id}
+
+	# Handle unwrapping parens (A) -> A
+	if cond.begins_with("(") and cond.ends_with(")"):
+		var unwrapped := _unwrap_parens(cond)
+		if unwrapped != cond:
+			return _cond_to_ast(unwrapped)
+
+	# Default to expression
+	return {"type": "expression", "expression": cond}
+
+
+func _is_balanced(s: String) -> bool:
+	var depth := 0
+	for c in s:
+		if c == "(":
+			depth += 1
+		elif c == ")":
+			depth -= 1
+			if depth < 0:
+				return false
+	return depth == 0
+
+
+func _unwrap_parens(s: String) -> String:
+	s = s.strip_edges()
+	if s.length() >= 2 and s.begins_with("(") and s.ends_with(")"):
+		var inner := s.substr(1, s.length() - 2)
+		if _is_balanced(inner):
+			return inner
+	return s
+
+
+func _split_top_level(s: String, op: String) -> Array[String]:
+	var parts: Array[String] = []
+	var depth := 0
+	var last_start := 0
+	var i := 0
+	while i <= s.length() - op.length():
+		if s[i] == "(":
+			depth += 1
+		elif s[i] == ")":
+			depth -= 1
+		elif depth == 0 and s.substr(i, op.length()) == op:
+			parts.append(s.substr(last_start, i - last_start).strip_edges())
+			i += op.length()
+			last_start = i
+			continue
+		i += 1
+	parts.append(s.substr(last_start).strip_edges())
+	return parts
 
 
 func _instantiate_state_tree(
@@ -230,7 +321,9 @@ func _instantiate_state_tree(
 		state_node.add_child(transition)
 		_set_owner(transition, state_node.owner if state_node.owner else state_node)
 		pending_transitions.append(
-			PendingTransition.new(transition, parsed_transition.target_id, parsed_transition.guard_ast)
+			PendingTransition.new(
+				transition, parsed_transition.target_id, parsed_transition.guard_ast
+			)
 		)
 
 	if state_node is CompoundState:
@@ -293,10 +386,12 @@ func _resolve_pending_transitions(
 			continue
 		if target_state != null:
 			pending.node.to = pending.node.get_path_to(target_state)
-		pending.node.guard = _guard_from_ast(pending.guard_ast)
+		pending.node.guard = _guard_from_ast(pending.guard_ast, pending.node, state_by_id)
 
 
-func _guard_from_ast(ast: Dictionary) -> Guard:
+func _guard_from_ast(
+	ast: Dictionary, context_transition: Transition, state_by_id: Dictionary
+) -> Guard:
 	if ast.is_empty():
 		return null
 
@@ -307,30 +402,43 @@ func _guard_from_ast(ast: Dictionary) -> Guard:
 			return guard
 		"state_is_active":
 			var guard := StateIsActiveGuardScript.new()
-			guard.state = NodePath(String(ast.get("state", "")))
+			var state_id := String(ast.get("state", ""))
+			var target_state := state_by_id.get(StringName(state_id)) as StateChartState
+			if target_state:
+				guard.state = context_transition.get_path_to(target_state)
+			else:
+				guard.state = NodePath(state_id)
 			return guard
 		"not":
 			var guard := NotGuardScript.new()
-			guard.guard = _guard_from_ast(ast.get("guard", {}))
+			guard.guard = _guard_from_ast(ast.get("guard", {}), context_transition, state_by_id)
 			return guard
 		"all_of":
 			var guard := AllOfGuardScript.new()
-			guard.guards = _guards_from_ast_array(ast.get("guards", []))
+			guard.guards = _guards_from_ast_array(
+				ast.get("guards", []), context_transition, state_by_id
+			)
 			return guard
 		"any_of":
 			var guard := AnyOfGuardScript.new()
-			guard.guards = _guards_from_ast_array(ast.get("guards", []))
+			guard.guards = _guards_from_ast_array(
+				ast.get("guards", []), context_transition, state_by_id
+			)
 			return guard
 
-	push_warning("Unsupported SCXML guard type '%s'. Guard was ignored." % String(ast.get("type", "")))
+	push_warning(
+		"Unsupported SCXML guard type '%s'. Guard was ignored." % String(ast.get("type", ""))
+	)
 	return null
 
 
-func _guards_from_ast_array(items: Array) -> Array[Guard]:
+func _guards_from_ast_array(
+	items: Array, context_transition: Transition, state_by_id: Dictionary
+) -> Array[Guard]:
 	var guards: Array[Guard] = []
 	for item in items:
 		if item is Dictionary:
-			var guard := _guard_from_ast(item)
+			var guard := _guard_from_ast(item, context_transition, state_by_id)
 			if guard != null:
 				guards.append(guard)
 	return guards
