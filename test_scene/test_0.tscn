@@ -4,39 +4,137 @@
 [ext_resource type="Script" uid="uid://dixum303kfne4" path="res://test_scene/test_player_sc.gd" id="2_player_sc"]
 [ext_resource type="Script" uid="uid://jk2jm1g6q853" path="res://addons/godot_state_charts/compound_state.gd" id="3_compound"]
 [ext_resource type="Script" uid="uid://cytafq8i1y8qm" path="res://addons/godot_state_charts/atomic_state.gd" id="4_atomic"]
-[ext_resource type="Script" uid="uid://cf1nsco3w0mf6" path="res://addons/godot_state_charts/transition.gd" id="5_transition"]
+[ext_resource type="Script" uid="uid://c1vp0ojjvaby1" path="res://addons/godot_state_charts/parallel_state.gd" id="5_parallel"]
+[ext_resource type="Script" uid="uid://cf1nsco3w0mf6" path="res://addons/godot_state_charts/transition.gd" id="6_transition"]
+[ext_resource type="Script" uid="uid://c6l0181f4ytps" path="res://addons/godot_state_charts/guard.gd" id="7_b760a"]
+[ext_resource type="Script" uid="uid://le5w1cm0ul8p" path="res://addons/godot_state_charts/expression_guard.gd" id="7_expr_guard"]
+[ext_resource type="Script" uid="uid://bambbrd2wupx0" path="res://addons/godot_state_charts/state_is_active_guard.gd" id="8_active_guard"]
+[ext_resource type="Script" uid="uid://dgd4i8hrrxfvm" path="res://addons/godot_state_charts/not_guard.gd" id="9_not_guard"]
+[ext_resource type="Script" uid="uid://bxprlw40wl0c3" path="res://addons/godot_state_charts/all_of_guard.gd" id="10_all_of"]
 
-[node name="Test0" type="Node2D" unique_id=1633708888]
+[sub_resource type="Resource" id="Resource_b760a"]
+script = ExtResource("7_expr_guard")
+expression = "ammo > 0"
+
+[sub_resource type="Resource" id="Resource_f8wj1"]
+script = ExtResource("8_active_guard")
+state = NodePath("../../../Movement/OnGround")
+
+[sub_resource type="Resource" id="Resource_hj51b"]
+script = ExtResource("10_all_of")
+guards = Array[ExtResource("7_b760a")]([SubResource("Resource_b760a"), SubResource("Resource_f8wj1")])
+
+[sub_resource type="Resource" id="Resource_2x1e1"]
+script = ExtResource("7_expr_guard")
+expression = "!is_invincible"
+
+[sub_resource type="Resource" id="Resource_8difl"]
+script = ExtResource("7_expr_guard")
+expression = "health > 0"
+
+[sub_resource type="Resource" id="Resource_tejsh"]
+script = ExtResource("10_all_of")
+guards = Array[ExtResource("7_b760a")]([SubResource("Resource_2x1e1"), SubResource("Resource_8difl")])
+
+[sub_resource type="Resource" id="Resource_5fj5x"]
+script = ExtResource("7_expr_guard")
+expression = "!is_invincible"
+
+[sub_resource type="Resource" id="Resource_i8f6p"]
+script = ExtResource("9_not_guard")
+guard = SubResource("Resource_5fj5x")
+
+[node name="Test0" type="Node2D" unique_id=2059610973]
 script = ExtResource("1_driver")
 
-[node name="TestPlayerSC" type="Node" parent="." unique_id=1593524453]
+[node name="Player" type="Node" parent="." unique_id=229937723]
 unique_name_in_owner = true
 script = ExtResource("2_player_sc")
 
-[node name="Root" type="Node" parent="TestPlayerSC" unique_id=1097750222]
+[node name="Root" type="Node" parent="Player" unique_id=499059036]
 script = ExtResource("3_compound")
-initial_state = NodePath("Idle")
+initial_state = NodePath("Dead")
 
-[node name="Idle" type="Node" parent="TestPlayerSC/Root" unique_id=1266501081]
+[node name="Alive" type="Node" parent="Player/Root" unique_id=792938011]
+script = ExtResource("3_compound")
+initial_state = NodePath("Stunned")
+
+[node name="Normal" type="Node" parent="Player/Root/Alive" unique_id=1381681530]
+script = ExtResource("5_parallel")
+
+[node name="Movement" type="Node" parent="Player/Root/Alive/Normal" unique_id=641718614]
+script = ExtResource("3_compound")
+initial_state = NodePath("Airborne")
+
+[node name="OnGround" type="Node" parent="Player/Root/Alive/Normal/Movement" unique_id=129490292]
 script = ExtResource("4_atomic")
 
-[node name="ToMove" type="Node" parent="TestPlayerSC/Root/Idle" unique_id=2078257738]
-script = ExtResource("5_transition")
-to = NodePath("../../Move")
-event = &"move"
+[node name="Jump" type="Node" parent="Player/Root/Alive/Normal/Movement/OnGround" unique_id=1708673686]
+script = ExtResource("6_transition")
+to = NodePath("../../Airborne")
+event = &"jump"
 delay_in_seconds = "0.0"
 
-[node name="OnHealthChanged" type="Node" parent="TestPlayerSC/Root/Idle" unique_id=484878428]
-script = ExtResource("5_transition")
-to = NodePath("..")
-event = &"health_changed"
-delay_in_seconds = "0.0"
-
-[node name="Move" type="Node" parent="TestPlayerSC/Root" unique_id=2081360102]
+[node name="Airborne" type="Node" parent="Player/Root/Alive/Normal/Movement" unique_id=378349033]
 script = ExtResource("4_atomic")
 
-[node name="ToIdle" type="Node" parent="TestPlayerSC/Root/Move" unique_id=1068063174]
-script = ExtResource("5_transition")
-to = NodePath("../../Idle")
-event = &"stop"
+[node name="Land" type="Node" parent="Player/Root/Alive/Normal/Movement/Airborne" unique_id=1995132288]
+script = ExtResource("6_transition")
+to = NodePath("../../OnGround")
+event = &"land"
+delay_in_seconds = "0.0"
+
+[node name="Weapon" type="Node" parent="Player/Root/Alive/Normal" unique_id=141966180]
+script = ExtResource("3_compound")
+initial_state = NodePath("Reloading")
+
+[node name="Ready" type="Node" parent="Player/Root/Alive/Normal/Weapon" unique_id=155097079]
+script = ExtResource("4_atomic")
+
+[node name="Attack" type="Node" parent="Player/Root/Alive/Normal/Weapon/Ready" unique_id=1607306268]
+script = ExtResource("6_transition")
+to = NodePath("../../Reloading")
+event = &"attack"
+guard = SubResource("Resource_hj51b")
+delay_in_seconds = "0.0"
+
+[node name="Reloading" type="Node" parent="Player/Root/Alive/Normal/Weapon" unique_id=901396156]
+script = ExtResource("4_atomic")
+
+[node name="ReloadDone" type="Node" parent="Player/Root/Alive/Normal/Weapon/Reloading" unique_id=915069677]
+script = ExtResource("6_transition")
+to = NodePath("../../Ready")
+event = &"reload_done"
+delay_in_seconds = "1.0"
+
+[node name="Stunned" type="Node" parent="Player/Root/Alive" unique_id=2036008690]
+script = ExtResource("4_atomic")
+
+[node name="Recover" type="Node" parent="Player/Root/Alive/Stunned" unique_id=262732101]
+script = ExtResource("6_transition")
+to = NodePath("../../Normal")
+event = &"stun_end"
+delay_in_seconds = "0.0"
+
+[node name="StunTrigger" type="Node" parent="Player/Root/Alive" unique_id=765167853]
+script = ExtResource("6_transition")
+to = NodePath("../Stunned")
+event = &"stun"
+guard = SubResource("Resource_tejsh")
+delay_in_seconds = "0.0"
+
+[node name="DieTrigger" type="Node" parent="Player/Root/Alive" unique_id=302323961]
+script = ExtResource("6_transition")
+to = NodePath("../../Dead")
+event = &"die"
+guard = SubResource("Resource_i8f6p")
+delay_in_seconds = "0.0"
+
+[node name="Dead" type="Node" parent="Player/Root" unique_id=2137786512]
+script = ExtResource("4_atomic")
+
+[node name="Respawn" type="Node" parent="Player/Root/Dead" unique_id=428146291]
+script = ExtResource("6_transition")
+to = NodePath("../../Alive")
+event = &"respawn"
 delay_in_seconds = "0.0"

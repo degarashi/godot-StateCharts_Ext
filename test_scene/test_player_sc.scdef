@@ -1,13 +1,19 @@
 class TestPlayerSC
 
-## Start moving the player.
-event move
-event stop
+# --- Events ---
+event jump
+event land
+event attack
+event reload_done
+event stun
+event stun_end
+event die
+event respawn
 
-## Health with initial value.
-## Automatically triggers health_changed on change.
+# --- Parameters ---
 param health float = 100.0 { health_changed: true }
 event health_changed
 
-## Movement speed, only exists in Move state.
-param speed float = 5.0 { local: Move }
+param ammo int = 10
+param is_invincible bool = false
+param speed float = 5.0
