@@ -3,13 +3,21 @@
 class_name StateChartScxmlImporter
 extends RefCounted
 
+const EXT_NAMESPACE_PREFIX := "statechart_ext"
+const DELAY_ATTR_NAME := "%s:delay_in_seconds" % EXT_NAMESPACE_PREFIX
+
+
 class ParsedTransition:
 	var event: StringName
 	var target_id: StringName
+	var delay_in_seconds: String
 
-	func _init(event_a: StringName = &"", target_id_a: StringName = &"") -> void:
+	func _init(
+		event_a: StringName = &"", target_id_a: StringName = &"", delay_in_seconds_a: String = "0.0"
+	) -> void:
 		event = event_a
 		target_id = target_id_a
+		delay_in_seconds = delay_in_seconds_a
 
 
 class ParsedState:
@@ -19,7 +27,9 @@ class ParsedState:
 	var children: Array[ParsedState] = []
 	var transitions: Array[ParsedTransition] = []
 
-	func _init(id_a: StringName = &"", kind_a: StringName = &"state", initial_id_a: StringName = &"") -> void:
+	func _init(
+		id_a: StringName = &"", kind_a: StringName = &"state", initial_id_a: StringName = &""
+	) -> void:
 		id = id_a
 		kind = kind_a
 		initial_id = initial_id_a
@@ -123,7 +133,8 @@ func _parse_state_element(xml: XMLParser, element_name: String) -> ParsedState:
 					parsed.transitions.append(
 						ParsedTransition.new(
 							StringName(xml.get_named_attribute_value_safe("event")),
-							_parse_transition_target(xml.get_named_attribute_value_safe("target"))
+							_parse_transition_target(xml.get_named_attribute_value_safe("target")),
+							_parse_transition_delay(xml)
 						)
 					)
 			XMLParser.NODE_ELEMENT_END:
@@ -138,8 +149,17 @@ func _parse_transition_target(target_attr: String) -> StringName:
 	if target_ids.is_empty():
 		return &""
 	if target_ids.size() > 1:
-		push_warning("Multiple SCXML transition targets are not supported yet. Using the first target.")
+		push_warning(
+			"Multiple SCXML transition targets are not supported yet. Using the first target."
+		)
 	return StringName(target_ids[0])
+
+
+func _parse_transition_delay(xml: XMLParser) -> String:
+	var delay_attr := xml.get_named_attribute_value_safe(DELAY_ATTR_NAME)
+	if not delay_attr.is_empty():
+		return delay_attr
+	return "0.0"
 
 
 func _instantiate_state_tree(
@@ -153,7 +173,9 @@ func _instantiate_state_tree(
 	_set_owner(state_node, parent.owner if parent.owner else parent)
 
 	if parsed.id in state_by_id:
-		push_warning("Duplicate SCXML state id '%s'. Transition resolution may be ambiguous." % parsed.id)
+		push_warning(
+			"Duplicate SCXML state id '%s'. Transition resolution may be ambiguous." % parsed.id
+		)
 	state_by_id[parsed.id] = state_node
 
 	for child_parsed in parsed.children:
@@ -163,10 +185,13 @@ func _instantiate_state_tree(
 		var transition := Transition.new()
 		transition.name = "Transition"
 		transition.event = parsed_transition.event
+		transition.delay_in_seconds = parsed_transition.delay_in_seconds
 		state_node.add_child(transition)
 		_set_owner(transition, state_node.owner if state_node.owner else state_node)
 		if not parsed_transition.target_id.is_empty():
-			pending_transitions.append(PendingTransition.new(transition, parsed_transition.target_id))
+			pending_transitions.append(
+				PendingTransition.new(transition, parsed_transition.target_id)
+			)
 
 	if state_node is CompoundState:
 		_assign_initial_state(state_node as CompoundState, parsed)
@@ -203,8 +228,10 @@ func _assign_initial_state(state_node: CompoundState, parsed: ParsedState) -> vo
 				break
 		if initial_target == null:
 			push_warning(
-				"Initial state '%s' was not found under '%s'. Falling back to the first child."
-				% [parsed.initial_id, parsed.id]
+				(
+					"Initial state '%s' was not found under '%s'. Falling back to the first child."
+					% [parsed.initial_id, parsed.id]
+				)
 			)
 
 	if initial_target == null:
@@ -220,6 +247,8 @@ func _resolve_pending_transitions(
 	for pending in pending_transitions:
 		var target_state := state_by_id.get(pending.target_id) as StateChartState
 		if target_state == null:
-			push_warning("Transition target '%s' was not found in imported SCXML." % pending.target_id)
+			push_warning(
+				"Transition target '%s' was not found in imported SCXML." % pending.target_id
+			)
 			continue
 		pending.node.to = pending.node.get_path_to(target_state)
