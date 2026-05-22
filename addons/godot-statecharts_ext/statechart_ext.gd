@@ -738,15 +738,24 @@ func set_expression_property_ext(
 		var prev_str := "None" if prev is NoneValue else str(prev)
 		DLogger.debug("Param '{0}' changed: {1} -> {2}", [param_name, prev_str, value], CAT, self)
 
+	var can_call_base := is_instance_valid(_state)
+
 	if not suppress_notify:
-		super.set_expression_property(param_ent.name, value)
+		if can_call_base:
+			super.set_expression_property(param_ent.name, value)
+		else:
+			_expression_properties[param_ent.name] = value
+
 		var ntf_ar := param_ent.notify
 		for ntf in ntf_ar:
 			var should_call: bool = (prev is NoneValue) or ntf.checker.call(prev, value)
 			if should_call:
 				send_event_ext(ntf.event)
 	else:
-		super.set_expression_property(param_name, value)
+		if can_call_base:
+			super.set_expression_property(param_name, value)
+		else:
+			_expression_properties[param_name] = value
 
 
 ## Sets a parameter that is automatically removed when leaving the specified state.
@@ -758,6 +767,11 @@ func set_expression_property_local(
 		target_state = _get_best_context_state()
 
 	if target_state == null:
+		if Engine.is_editor_hint():
+			# In editor, just set it as normal property if no state context
+			set_expression_property_ext(param_ent, value, suppress_notify)
+			return
+
 		DLogger.error(
 			"set_expression_property_local: No active state context. {0}",
 			[param_ent.name],
@@ -796,7 +810,8 @@ func send_event_ext(event_ent: EventEnt) -> void:
 			CAT,
 			self
 		)
-	super.send_event(event_ent.name)
+	if is_instance_valid(_state):
+		super.send_event(event_ent.name)
 
 
 func set_expression_property(value_name: StringName, value: Variant) -> void:
