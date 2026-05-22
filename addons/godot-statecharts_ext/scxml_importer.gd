@@ -6,6 +6,13 @@ extends RefCounted
 const EXT_NAMESPACE_PREFIX := "statechart_ext"
 const DELAY_ATTR_NAME := "%s:delay_in_seconds" % EXT_NAMESPACE_PREFIX
 const NAME_ATTR_NAME := "%s:name" % EXT_NAMESPACE_PREFIX
+const GUARD_JSON_ATTR_NAME := "%s:guard_json" % EXT_NAMESPACE_PREFIX
+
+const ExpressionGuardScript := preload("res://addons/godot_state_charts/expression_guard.gd")
+const StateIsActiveGuardScript := preload("res://addons/godot_state_charts/state_is_active_guard.gd")
+const NotGuardScript := preload("res://addons/godot_state_charts/not_guard.gd")
+const AllOfGuardScript := preload("res://addons/godot_state_charts/all_of_guard.gd")
+const AnyOfGuardScript := preload("res://addons/godot_state_charts/any_of_guard.gd")
 
 
 class ParsedTransition:
@@ -13,17 +20,20 @@ class ParsedTransition:
 	var event: StringName
 	var target_id: StringName
 	var delay_in_seconds: String
+	var guard_ast: Dictionary
 
 	func _init(
 		name_a: String = "Transition",
 		event_a: StringName = &"",
 		target_id_a: StringName = &"",
-		delay_in_seconds_a: String = "0.0"
+		delay_in_seconds_a: String = "0.0",
+		guard_ast_a: Dictionary = {}
 	) -> void:
 		name = name_a
 		event = event_a
 		target_id = target_id_a
 		delay_in_seconds = delay_in_seconds_a
+		guard_ast = guard_ast_a
 
 
 class ParsedState:
@@ -44,10 +54,12 @@ class ParsedState:
 class PendingTransition:
 	var node: Transition
 	var target_id: StringName
+	var guard_ast: Dictionary
 
-	func _init(node_a: Transition, target_id_a: StringName) -> void:
+	func _init(node_a: Transition, target_id_a: StringName, guard_ast_a: Dictionary = {}) -> void:
 		node = node_a
 		target_id = target_id_a
+		guard_ast = guard_ast_a
 
 
 func _set_owner(node: Node, owner_node: Node) -> void:
@@ -141,7 +153,8 @@ func _parse_state_element(xml: XMLParser, element_name: String) -> ParsedState:
 							_parse_transition_name(xml),
 							StringName(xml.get_named_attribute_value_safe("event")),
 							_parse_transition_target(xml.get_named_attribute_value_safe("target")),
-							_parse_transition_delay(xml)
+							_parse_transition_delay(xml),
+							_parse_transition_guard_ast(xml)
 						)
 					)
 			XMLParser.NODE_ELEMENT_END:
@@ -176,6 +189,20 @@ func _parse_transition_delay(xml: XMLParser) -> String:
 	return "0.0"
 
 
+func _parse_transition_guard_ast(xml: XMLParser) -> Dictionary:
+	var guard_json := xml.get_named_attribute_value_safe(GUARD_JSON_ATTR_NAME)
+	if not guard_json.is_empty():
+		var parsed_json := JSON.parse_string(guard_json)
+		if parsed_json is Dictionary:
+			return parsed_json
+		push_warning("Invalid SCXML guard JSON encountered. Ignoring custom guard data.")
+
+	var cond := xml.get_named_attribute_value_safe("cond")
+	if not cond.is_empty():
+		return {"type": "expression", "expression": cond}
+	return {}
+
+
 func _instantiate_state_tree(
 	parsed: ParsedState,
 	parent: Node,
@@ -202,10 +229,9 @@ func _instantiate_state_tree(
 		transition.delay_in_seconds = parsed_transition.delay_in_seconds
 		state_node.add_child(transition)
 		_set_owner(transition, state_node.owner if state_node.owner else state_node)
-		if not parsed_transition.target_id.is_empty():
-			pending_transitions.append(
-				PendingTransition.new(transition, parsed_transition.target_id)
-			)
+		pending_transitions.append(
+			PendingTransition.new(transition, parsed_transition.target_id, parsed_transition.guard_ast)
+		)
 
 	if state_node is CompoundState:
 		_assign_initial_state(state_node as CompoundState, parsed)
@@ -260,9 +286,51 @@ func _resolve_pending_transitions(
 ) -> void:
 	for pending in pending_transitions:
 		var target_state := state_by_id.get(pending.target_id) as StateChartState
-		if target_state == null:
+		if not pending.target_id.is_empty() and target_state == null:
 			push_warning(
 				"Transition target '%s' was not found in imported SCXML." % pending.target_id
 			)
 			continue
-		pending.node.to = pending.node.get_path_to(target_state)
+		if target_state != null:
+			pending.node.to = pending.node.get_path_to(target_state)
+		pending.node.guard = _guard_from_ast(pending.guard_ast)
+
+
+func _guard_from_ast(ast: Dictionary) -> Guard:
+	if ast.is_empty():
+		return null
+
+	match String(ast.get("type", "")):
+		"expression":
+			var guard := ExpressionGuardScript.new()
+			guard.expression = String(ast.get("expression", ""))
+			return guard
+		"state_is_active":
+			var guard := StateIsActiveGuardScript.new()
+			guard.state = NodePath(String(ast.get("state", "")))
+			return guard
+		"not":
+			var guard := NotGuardScript.new()
+			guard.guard = _guard_from_ast(ast.get("guard", {}))
+			return guard
+		"all_of":
+			var guard := AllOfGuardScript.new()
+			guard.guards = _guards_from_ast_array(ast.get("guards", []))
+			return guard
+		"any_of":
+			var guard := AnyOfGuardScript.new()
+			guard.guards = _guards_from_ast_array(ast.get("guards", []))
+			return guard
+
+	push_warning("Unsupported SCXML guard type '%s'. Guard was ignored." % String(ast.get("type", "")))
+	return null
+
+
+func _guards_from_ast_array(items: Array) -> Array[Guard]:
+	var guards: Array[Guard] = []
+	for item in items:
+		if item is Dictionary:
+			var guard := _guard_from_ast(item)
+			if guard != null:
+				guards.append(guard)
+	return guards
