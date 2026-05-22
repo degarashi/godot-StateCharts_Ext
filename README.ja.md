@@ -10,9 +10,10 @@
     - `sc.e.event_name.call()`: 定義したイベント名で直感的にイベントを送信できる。
     - `sc.p.param_name = value`: パラメータへの直接アクセスと代入が可能。内部で自動的な型チェックが行われる。
 - **自動通知機能**: パラメータの値が変更された際に、自動的に特定のイベントをトリガーするように設定できる。
-- **ステート・ローカルパラメータ**: 特定のステートに紐付き、そのステートを抜ける際に自動的にクリーンアップされるパラメータを簡単に管理できる。
+- **ステート・ローカルパラメータ**: 特定のステートがアクティブな間だけ存在するパラメータを管理できる。
+- **初期値のサポート**: 定義ファイルでパラメータの初期値を指定できる。
 - **エディタ統合**: 定義名や型が一致しない場合、Godot エディタ上に設定警告（Configuration Warnings）を表示するバリデーション機能を備えている。
-- **ログ統合**: 詳細な診断ログ出力をサポートしている（`DLogger` と互換）。
+- **インスペクタ表示**: StateChart のパラメータを Godot のインスペクタから直接確認・編集できる（実行時のデバッグに便利）。
 
 ## インストール方法
 
@@ -22,9 +23,9 @@
 
 ## 使い方ガイド
 
-### StateChart の定義 (新機能: 自動生成)
+### StateChart の定義 (自動生成)
 
-シンプルなテキスト形式の定義ファイル (`.scdef`) を使用して、GDScript のボイラープレートを自動生成できるようになった。
+シンプルなテキスト形式の定義ファイル (`.scdef`) を使用して、GDScript のボイラープレートを自動生成できる。
 
 `player.scdef` という名前でファイルを作成する：
 ```text
@@ -34,11 +35,17 @@ event jump
 event crouch
 event health_changed
 
-param health float { health_changed: true }
-param ammo int
+# 初期値 100.0、変更時に health_changed をトリガー
+param health float = 100.0 { health_changed: true }
+
+# ステート "Move" の間だけ存在し、かつ変更時に speed_changed をトリガーする
+param speed float = 5.0 { local: Move, speed_changed: true }
+
+param ammo int = 10
+event speed_changed
 ```
 
-このファイルを保存すると、プラグインが自動的に `player.gd` を生成・更新する。その後、この `player.gd` を StateChart ノードにアタッチするだけで利用可能になる。
+このファイルを保存すると、プラグインが自動的に `player.gd` を生成・更新する。
 
 ---
 
@@ -59,9 +66,9 @@ class Event:
 # パラメータの定義
 class Param:
     extends StateChartExt.Param
-    # health は値が実際に変更された時のみ 'health_changed' イベントをトリガーする
-    static var health := p(TYPE_FLOAT, { PlayerSC.Event.health_changed: true })
-    static var speed := p(TYPE_FLOAT)
+    # p(type, notify_map, initial_value, local_state_name)
+    static var health := p(TYPE_FLOAT, { PlayerSC.Event.health_changed: true }, 100.0)
+    static var speed := p(TYPE_FLOAT, {}, 5.0, &"Move")
 
 # StateChart と紐付ける
 func get_sc_info() -> SCInfo:
@@ -74,41 +81,39 @@ func get_sc_info() -> SCInfo:
 
 ### コードからのアクセス
 
-`e` (events) と `p` (parameters) プロキシを使用して、クリーンな API で操作する。
+`e` (events) と `p` (parameters) プロキシを使用して操作する。
 
 ```gdscript
 @onready var sc: PlayerSC = $StateChart
 
 func _ready():
-    # パラメータの設定（自動イベントがトリガーされる）
-    sc.p.health = 100.0
+    # 非ローカルパラメータは定義時の初期値で自動初期化される
+    print(sc.p.health) # 100.0
     
-    # アクセス前の安全な存在チェック
+    # パラメータの設定（自動イベントがトリガーされる）
+    sc.p.health = 90.0
+    
+    # インスペクタからパラメータを直接変更することも可能（p/health など）
+
+    # アクセス前の存在チェック
     if sc.p.has("speed"):
         print(sc.p.speed)
 
 func take_damage(amount: float):
     sc.p.health -= amount
     if sc.p.health <= 0:
-        # .call() を使用してイベントを送信
         sc.e.die.call()
 ```
 
 ### ローカルパラメータ
 
-特定のステートがアクティブな間だけ存在するパラメータを設定する。
+`.scdef` で `{ local: StateName }` を指定した場合、そのステートに進入した際に**自動的に**初期値でパラメータが登録され、ステートを抜ける際に自動的に削除される。
 
+手動で動的なローカルパラメータを設定する場合：
 ```gdscript
-# 現在のステートを抜ける際、StateChart から自動的に削除される
+# 指定したステートを抜ける際、StateChart から自動的に削除される
 sc.local().set_param(PlayerSC.Param.speed, 10.0)
 ```
-
-## 安全上の注意 (GDScript 2.0 プロキシ)
-
-Godot 4 の動的プロパティアクセスの仕様により、以下の点に注意すること。
-- イベントの送信には `sc.e.event_name.call()` を使用すること。
-- パラメータが登録されているか不明な場合（ローカルパラメータなど）は、`sc.p.has("param_name")` を使用してチェックすること。
-- プロキシ上の存在しないプロパティに直接アクセスすると、実行時エラーが発生する。
 
 ## ライセンス
 
