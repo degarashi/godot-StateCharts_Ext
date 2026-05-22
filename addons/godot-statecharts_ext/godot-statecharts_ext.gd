@@ -6,9 +6,10 @@ extends EditorPlugin
 # ------------- [Constants] -------------
 const CAT := "ScExt_Gen"
 
-# ------------- [Private Variable] -------------
+# ------------- [Private Variables] -------------
 var _fs_reloading := false
 var _import_plugin: RefCounted
+var _inspector_plugin: EditorInspectorPlugin
 
 
 # ------------- [Callbacks] -------------
@@ -17,6 +18,9 @@ func _enter_tree() -> void:
 
 	_import_plugin = preload("scdef_import_plugin.gd").new()
 	add_import_plugin(_import_plugin)
+
+	# Wait for the editor to be fully ready before registration
+	_register_inspector_delayed()
 
 	var fs := EditorInterface.get_resource_filesystem()
 	fs.filesystem_changed.connect(_on_filesystem_changed)
@@ -30,10 +34,30 @@ func _enter_tree() -> void:
 	timer.timeout.connect(_on_filesystem_changed)
 
 
+func _register_inspector_delayed() -> void:
+	# Wait 1 frame until the scene tree is ready
+	if not is_inside_tree():
+		await tree_entered
+	await get_tree().process_frame
+
+	# If an existing plugin exists, remove it first before registering
+	if _inspector_plugin:
+		remove_inspector_plugin(_inspector_plugin)
+		_inspector_plugin = null
+
+	_inspector_plugin = preload("transition_inspector_plugin.gd").new()
+	add_inspector_plugin(_inspector_plugin)
+	DLogger.info("Transition Inspector Plugin registered safely.", [], CAT)
+
+
 func _exit_tree() -> void:
 	if _import_plugin:
 		remove_import_plugin(_import_plugin)
 		_import_plugin = null
+
+	if _inspector_plugin:
+		remove_inspector_plugin(_inspector_plugin)
+		_inspector_plugin = null
 
 	remove_tool_menu_item("StateChartExt: Force Regenerate all .scdef")
 
@@ -58,7 +82,7 @@ func _on_filesystem_changed() -> void:
 	_fs_reloading = false
 
 
-# ------------- [Private Method] -------------
+# ------------- [Private Methods] -------------
 func _manual_scan() -> void:
 	DLogger.info("Manual scan started...", [], CAT)
 	EditorInterface.get_resource_filesystem().scan()
