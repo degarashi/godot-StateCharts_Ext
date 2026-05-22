@@ -1,7 +1,11 @@
 @tool
+## Generator class that parses .scdef files and produces GDScript boilerplate.
+## Handles the definition of the Proxy API, event/parameter classes, and initialization code.
 class_name StateChartGenerator
 extends RefCounted
 
+# ------------- [Constants] -------------
+## Map from scdef type names to Godot TYPE_ constant names
 const TYPE_MAP: Dictionary[String, String] = {
 	"float": "TYPE_FLOAT",
 	"int": "TYPE_INT",
@@ -37,6 +41,7 @@ const TYPE_MAP: Dictionary[String, String] = {
 	"variant": "TYPE_NIL"
 }
 
+## Map from scdef type names to GDScript type annotations
 const GD_TYPE_MAP: Dictionary[String, String] = {
 	"float": "float",
 	"int": "int",
@@ -73,7 +78,9 @@ const GD_TYPE_MAP: Dictionary[String, String] = {
 }
 
 
-static func generate_script(class_name_str: String, events: Array, params: Array) -> String:
+# ------------- [Private Static Method] -------------
+## Generates GDScript source code from given data
+static func _generate_script(class_name_str: String, events: Array, params: Array) -> String:
 	var lines: Array[String] = []
 	lines.append("# [StateChartExt] Generated boilerplate. Do not edit manually.")
 	lines.append("@tool")
@@ -103,33 +110,33 @@ static func generate_script(class_name_str: String, events: Array, params: Array
 	if params.is_empty():
 		pass
 	else:
-		for p in params:
-			if not p.comment.is_empty():
-				lines.append("\t## %s" % p.comment)
-			var type_str: String = TYPE_MAP.get(p.type, "TYPE_NIL")
+		for p_data in params:
+			if not p_data.comment.is_empty():
+				lines.append("\t## %s" % p_data.comment)
+			var type_str: String = TYPE_MAP.get(p_data.type, "TYPE_NIL")
 
 			var notify_map_code := "{}"
-			if not p.notify.is_empty():
+			if not p_data.notify.is_empty():
 				var notify_parts: Array[String] = []
-				for ev_name in p.notify:
-					var val = p.notify[ev_name]
+				for ev_name in p_data.notify:
+					var val = p_data.notify[ev_name]
 					notify_parts.append(
 						"%s.Event.%s: %s" % [class_name_str, ev_name, str(val).to_lower()]
 					)
 				notify_map_code = "{%s}" % ", ".join(notify_parts)
 
 			var init_val_code := "StateChartExt._s_none_value"
-			if not p.init.is_empty():
-				init_val_code = p.init
+			if not p_data.init.is_empty():
+				init_val_code = p_data.init
 
 			var local_state_code := '&""'
-			if not p.local_state.is_empty():
-				local_state_code = '&"%s"' % p.local_state
+			if not p_data.local_state.is_empty():
+				local_state_code = '&"%s"' % p_data.local_state
 
 			lines.append(
 				(
 					"\tstatic var %s := p(%s, %s, %s, %s)"
-					% [p.name, type_str, notify_map_code, init_val_code, local_state_code]
+					% [p_data.name, type_str, notify_map_code, init_val_code, local_state_code]
 				)
 			)
 	lines.append("")
@@ -157,8 +164,8 @@ static func generate_script(class_name_str: String, events: Array, params: Array
 	lines.append("class GParamProxy extends StateChartExt.ParamProxy:")
 
 	var param_names: Array[String] = []
-	for p in params:
-		param_names.append('"%s"' % p.name)
+	for p_data in params:
+		param_names.append('"%s"' % p_data.name)
 
 	lines.append("\tfunc has(name: String) -> bool:")
 	lines.append("\t\tif not name in [%s]: return false" % ", ".join(param_names))
@@ -168,25 +175,24 @@ static func generate_script(class_name_str: String, events: Array, params: Array
 	if params.is_empty():
 		pass
 	else:
-		for p in params:
-			var gd_type := GD_TYPE_MAP.get(p.type, "Variant")
-			lines.append("\tvar %s: %s:" % [p.name, gd_type])
+		for p_data in params:
+			var gd_type := GD_TYPE_MAP.get(p_data.type, "Variant")
+			lines.append("\tvar %s: %s:" % [p_data.name, gd_type])
 
 			var default_val_code := "null"
-			if p.type in GD_TYPE_MAP:
-				# Use _make_zero to get a safe default for the type
-				default_val_code = "_sc._make_zero(%s)" % TYPE_MAP[p.type]
+			if p_data.type in GD_TYPE_MAP:
+				default_val_code = "_sc._make_zero(%s)" % TYPE_MAP[p_data.type]
 
 			lines.append(
 				(
 					"\t\tget: return _sc.get_expression_property_ext(%s.Param.%s, %s)"
-					% [class_name_str, p.name, default_val_code]
+					% [class_name_str, p_data.name, default_val_code]
 				)
 			)
 			lines.append(
 				(
 					"\t\tset(v): _sc.set_expression_property_ext(%s.Param.%s, v)"
-					% [class_name_str, p.name]
+					% [class_name_str, p_data.name]
 				)
 			)
 	lines.append("")
@@ -205,6 +211,7 @@ static func generate_script(class_name_str: String, events: Array, params: Array
 	return "\n".join(lines)
 
 
+# ------------- [Public Method] -------------
 ## Parses scdef text and returns a Dictionary with "code" (String) and "error" (String, empty if OK).
 static func parse_and_generate(
 	text: String, fallback_name: String = "GeneratedStateChart"
@@ -252,14 +259,13 @@ static func parse_and_generate(
 		elif cmd == "event":
 			events.append({"name": name, "comment": final_comment})
 		elif cmd == "param":
-			# param <name> [type] [= initial_value] [{ options }]
 			var p_name := name
 			var p_type := "variant"
 			var p_init := ""
 			var p_notify: Dictionary[String, bool] = {}
 			var p_local_state := ""
 
-			# 1. Extract and remove brace content
+			# 1. Extract brace options
 			var brace_start := line_content.find("{")
 			var line_without_brace := line_content
 			if brace_start != -1:
@@ -270,7 +276,6 @@ static func parse_and_generate(
 					)
 					line_without_brace = line_content.substr(0, brace_start).strip_edges()
 
-					# Parse brace content
 					var pairs := brace_content.split(",", false)
 					for pair in pairs:
 						var kv := pair.split(":", false)
@@ -297,7 +302,7 @@ static func parse_and_generate(
 			if not error_msg.is_empty():
 				break
 
-			# 2. Extract initial value if exists
+			# 2. Extract initial value
 			var eq_pos := line_without_brace.find("=")
 			var line_before_eq := line_without_brace
 			if eq_pos != -1:
@@ -306,7 +311,6 @@ static func parse_and_generate(
 
 			# 3. Extract type
 			var p_parts := line_before_eq.split(" ", false)
-			# parts[0] is 'param', parts[1] is name
 			if p_parts.size() >= 3:
 				p_type = p_parts[2].to_lower()
 
@@ -331,4 +335,4 @@ static func parse_and_generate(
 	if not error_msg.is_empty():
 		return {"code": "", "error": error_msg}
 
-	return {"code": generate_script(class_name_str, events, params), "error": ""}
+	return {"code": _generate_script(class_name_str, events, params), "error": ""}

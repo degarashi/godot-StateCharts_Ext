@@ -1,11 +1,17 @@
 @tool
+## Main entry point for the Godot StateCharts Extra plugin.
+## Manages .scdef file monitoring, automatic code generation triggers, and registration of the import plugin.
 extends EditorPlugin
 
-const CAT = "ScExt_Gen"
+# ------------- [Constants] -------------
+const CAT := "ScExt_Gen"
+
+# ------------- [Private Variable] -------------
 var _fs_reloading := false
 var _import_plugin: RefCounted
 
 
+# ------------- [Callbacks] -------------
 func _enter_tree() -> void:
 	DLogger.info("Plugin enabled.", [], CAT)
 
@@ -19,13 +25,9 @@ func _enter_tree() -> void:
 
 	add_tool_menu_item("StateChartExt: Force Regenerate all .scdef", _manual_scan)
 
-	# Initial scan after a delay to ensure the filesystem is fully loaded
-	var timer = get_tree().create_timer(1.0)
+	# Wait for the filesystem to be fully loaded before initial scan
+	var timer := get_tree().create_timer(1.0)
 	timer.timeout.connect(_on_filesystem_changed)
-
-
-func _on_sources_changed(_exist: bool) -> void:
-	_on_filesystem_changed()
 
 
 func _exit_tree() -> void:
@@ -42,11 +44,8 @@ func _exit_tree() -> void:
 		fs.sources_changed.disconnect(_on_sources_changed)
 
 
-func _manual_scan() -> void:
-	DLogger.info("Manual scan started...", [], CAT)
-	EditorInterface.get_resource_filesystem().scan()
-	_scan_and_generate()
-	DLogger.info("Manual scan finished.", [], CAT)
+func _on_sources_changed(_exist: bool) -> void:
+	_on_filesystem_changed()
 
 
 func _on_filesystem_changed() -> void:
@@ -57,6 +56,14 @@ func _on_filesystem_changed() -> void:
 	_scan_and_generate()
 	await get_tree().create_timer(1.0).timeout
 	_fs_reloading = false
+
+
+# ------------- [Private Method] -------------
+func _manual_scan() -> void:
+	DLogger.info("Manual scan started...", [], CAT)
+	EditorInterface.get_resource_filesystem().scan()
+	_scan_and_generate()
+	DLogger.info("Manual scan finished.", [], CAT)
 
 
 func _scan_and_generate() -> void:
@@ -92,7 +99,7 @@ func _process_scdef_file(scdef_path: String) -> void:
 	if not f_scdef:
 		DLogger.error("Could not open scdef for reading: {0}", [scdef_path], CAT)
 		return
-	var content := f_scdef.get_as_text()
+	var content: String = f_scdef.get_as_text()
 	f_scdef.close()
 
 	var old_content := ""
@@ -103,7 +110,7 @@ func _process_scdef_file(scdef_path: String) -> void:
 			f_gd.close()
 
 	var fallback_name := scdef_path.get_file().get_basename().to_pascal_case() + "SC"
-	var result := StateChartGenerator.parse_and_generate(content, fallback_name)
+	var result: Dictionary = StateChartGenerator.parse_and_generate(content, fallback_name)
 
 	if not result.error.is_empty():
 		DLogger.error("Syntax error in {0}:\n{1}", [scdef_path, result.error], CAT)

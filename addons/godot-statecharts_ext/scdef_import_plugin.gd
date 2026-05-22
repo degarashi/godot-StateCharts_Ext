@@ -1,7 +1,10 @@
 @tool
+## Import plugin to make Godot recognize .scdef files and trigger automatic generation.
+## Does not generate an actual resource, but acts as a hook during saving.
 extends EditorImportPlugin
 
 
+# ------------- [Public Method] -------------
 func _get_importer_name() -> String:
 	return "statechart_ext.scdef"
 
@@ -35,7 +38,7 @@ func _get_option_visibility(_path: String, _option_name: StringName, _options: D
 
 
 func _import(
-	source_file: String,
+	_source_file: String,
 	save_path: String,
 	_options: Dictionary,
 	_platform_variants: Array[String],
