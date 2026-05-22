@@ -1,15 +1,13 @@
 class TestPlayerSC
 
 ## Start moving the player.
-## This triggers a transition to the Move state.
 event move
-event stop ## Stop moving
+event stop
 
-## Health has been updated
+## Health with initial value.
+## Automatically triggers health_changed on change.
+param health float = 100.0 { health_changed: true }
 event health_changed
 
-param health float { health_changed: true } ## Current health points
-
-## Movement speed in pixels per second.
-## Default is usually 0.0.
-param speed float
+## Movement speed, only exists in Move state.
+param speed float = 5.0 { local: Move }
