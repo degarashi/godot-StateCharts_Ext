@@ -14,6 +14,8 @@ This extension provides a statically typed wrapper to make state machine paramet
 - **Initial Value Support**: Specify initial values for parameters directly in the definition file.
 - **Editor Integration**: Validation logic that provides configuration warnings in the Godot editor if names or types don't match.
 - **Inspector Display**: View and edit StateChart parameters directly in the Godot Inspector (useful for real-time debugging).
+- **Transition Event Dropdown**: Avoid typing event names manually as strings on `Transition` nodes. The inspector automatically displays a dropdown list populated with all events defined in your `StateChartExt`.
+
 
 ## Installation
 
@@ -78,6 +80,9 @@ func get_sc_info() -> SCInfo:
 ### Attach and Configure
 
 Attach your script to a node in your scene (replacing the standard `StateChart` node). The extension will automatically discover your definitions.
+
+When configuring `Transition` nodes, the inspector's `event` property will automatically display a dropdown populated with all events defined in your `StateChartExt`, making configuration easy and preventing typos.
+
 
 ### Access in Code
 
