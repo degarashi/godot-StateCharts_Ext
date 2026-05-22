@@ -96,6 +96,10 @@ func _export_guard_attrs(node: Transition) -> Array[String]:
 	if node.guard == null:
 		return attrs
 
+	var cond := _guard_to_cond(node.guard, node)
+	if not cond.is_empty():
+		attrs.append('cond="%s"' % _escape_attr(cond))
+
 	var guard_ast := _guard_to_ast(node.guard, node)
 	if guard_ast.is_empty():
 		push_warning(
@@ -113,12 +117,45 @@ func _export_guard_attrs(node: Transition) -> Array[String]:
 		)
 		return attrs
 
-	if guard_ast.get("type", "") == "expression":
-		attrs.append('cond="%s"' % _escape_attr(String(guard_ast.get("expression", ""))))
-
 	var json := JSON.stringify(guard_ast, "")
 	attrs.append('%s="%s"' % [GUARD_JSON_ATTR_NAME, _escape_attr(json)])
 	return attrs
+
+
+func _guard_to_cond(guard: Guard, context_transition: Transition) -> String:
+	if guard == null:
+		return ""
+	if guard is ExpressionGuardScript:
+		return guard.expression
+	if guard is StateIsActiveGuardScript:
+		var target_node := context_transition.get_node_or_null(guard.state)
+		if target_node:
+			return "In('%s')" % target_node.name
+		return "In('%s')" % String(guard.state)
+	if guard is NotGuardScript:
+		var inner := _guard_to_cond(guard.guard, context_transition)
+		if inner.is_empty():
+			return ""
+		return "!(%s)" % inner
+	if guard is AllOfGuardScript:
+		var parts: Array[String] = []
+		for g in guard.guards:
+			var s := _guard_to_cond(g, context_transition)
+			if not s.is_empty():
+				parts.append("(%s)" % s)
+		if parts.is_empty():
+			return ""
+		return " && ".join(parts)
+	if guard is AnyOfGuardScript:
+		var parts: Array[String] = []
+		for g in guard.guards:
+			var s := _guard_to_cond(g, context_transition)
+			if not s.is_empty():
+				parts.append("(%s)" % s)
+		if parts.is_empty():
+			return ""
+		return " || ".join(parts)
+	return ""
 
 
 func _guard_to_ast(guard: Guard, context_transition: Transition) -> Dictionary:
