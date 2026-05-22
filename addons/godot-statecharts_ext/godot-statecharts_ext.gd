@@ -1,6 +1,7 @@
 @tool
 ## Main entry point for the Godot StateCharts Extra plugin.
-## Manages .scdef file monitoring, automatic code generation triggers, and registration of the import plugin.
+## Manages .scdef file monitoring, automatic code generation triggers,
+## and registration of the import plugin.
 extends EditorPlugin
 
 # ------------- [Constants] -------------
@@ -28,6 +29,8 @@ func _enter_tree() -> void:
 		fs.sources_changed.connect(_on_sources_changed)
 
 	add_tool_menu_item("StateChartExt: Force Regenerate all .scdef", _manual_scan)
+	add_tool_menu_item("StateChartExt: Export current StateChart as SCXML", _manual_export_scxml)
+	add_tool_menu_item("StateChartExt: Import SCXML to current StateChart", _manual_import_scxml)
 
 	# Wait for the filesystem to be fully loaded before initial scan
 	var timer := get_tree().create_timer(1.0)
@@ -44,6 +47,8 @@ func _exit_tree() -> void:
 		_inspector_plugin = null
 
 	remove_tool_menu_item("StateChartExt: Force Regenerate all .scdef")
+	remove_tool_menu_item("StateChartExt: Export current StateChart as SCXML")
+	remove_tool_menu_item("StateChartExt: Import SCXML to current StateChart")
 
 	var fs := EditorInterface.get_resource_filesystem()
 	if fs.filesystem_changed.is_connected(_on_filesystem_changed):
@@ -73,6 +78,70 @@ func _manual_scan() -> void:
 	EditorInterface.get_resource_filesystem().scan()
 	_scan_and_generate()
 	DLogger.info("Manual scan finished.", [], CAT)
+
+
+var _scxml_export_dialog: EditorFileDialog
+var _scxml_import_dialog: EditorFileDialog
+
+func _manual_export_scxml() -> void:
+	var selected_nodes := EditorInterface.get_selection().get_selected_nodes()
+	if selected_nodes.is_empty() or not selected_nodes[0] is StateChartExt:
+		DLogger.warn("Select a StateChartExt node to export.", [], CAT)
+		return
+
+	var node := selected_nodes[0]
+	if not _scxml_export_dialog:
+		_scxml_export_dialog = EditorFileDialog.new()
+		_scxml_export_dialog.file_mode = EditorFileDialog.FILE_MODE_SAVE_FILE
+		_scxml_export_dialog.add_filter("*.scxml", "SCXML files")
+		_scxml_export_dialog.file_selected.connect(_on_scxml_export_file_selected)
+		EditorInterface.get_base_control().add_child(_scxml_export_dialog)
+
+	_scxml_export_dialog.current_file = node.name + ".scxml"
+	_scxml_export_dialog.popup_centered_ratio(0.5)
+
+
+func _on_scxml_export_file_selected(path: String) -> void:
+	var selected_nodes := EditorInterface.get_selection().get_selected_nodes()
+	if selected_nodes.is_empty() or not selected_nodes[0] is StateChartExt:
+		return
+
+	var exporter := StateChartScxmlExporter.new()
+	var err := exporter.export_and_save(selected_nodes[0], path)
+	if err == OK:
+		DLogger.info("SCXML exported to: {0}", [path], CAT)
+	else:
+		DLogger.error("Failed to export SCXML: {0}", [err], CAT)
+
+
+func _manual_import_scxml() -> void:
+	var selected_nodes := EditorInterface.get_selection().get_selected_nodes()
+	if selected_nodes.is_empty() or not selected_nodes[0] is StateChartExt:
+		DLogger.warn("Select a StateChartExt node to import SCXML into.", [], CAT)
+		return
+
+	if not _scxml_import_dialog:
+		_scxml_import_dialog = EditorFileDialog.new()
+		_scxml_import_dialog.file_mode = EditorFileDialog.FILE_MODE_OPEN_FILE
+		_scxml_import_dialog.add_filter("*.scxml", "SCXML files")
+		_scxml_import_dialog.file_selected.connect(_on_scxml_import_file_selected)
+		EditorInterface.get_base_control().add_child(_scxml_import_dialog)
+
+	_scxml_import_dialog.popup_centered_ratio(0.5)
+
+
+func _on_scxml_import_file_selected(path: String) -> void:
+	var selected_nodes := EditorInterface.get_selection().get_selected_nodes()
+	if selected_nodes.is_empty() or not selected_nodes[0] is StateChartExt:
+		return
+
+	var importer := StateChartScxmlImporter.new()
+	var err := importer.import_scxml(path, selected_nodes[0])
+	if err == OK:
+		DLogger.info("SCXML imported successfully: {0}", [path], CAT)
+	else:
+		DLogger.error("Failed to import SCXML: {0}", [err], CAT)
+
 
 
 func _process_scdef_file(scdef_path: String) -> void:
