@@ -89,6 +89,7 @@ func import_scxml(path: String, root_node: Node) -> Error:
 	var scxml_initial := StringName()
 	var scxml_name := &"Root"
 	var parsed_root_states: Array[ParsedState] = []
+	var initial_properties: Dictionary = {}
 
 	while xml.read() == OK:
 		if xml.get_node_type() != XMLParser.NODE_ELEMENT:
@@ -100,8 +101,12 @@ func import_scxml(path: String, root_node: Node) -> Error:
 			var scxml_name_attr := xml.get_named_attribute_value_safe("name")
 			if not scxml_name_attr.is_empty():
 				scxml_name = StringName(scxml_name_attr)
+		elif node_name == "datamodel":
+			_parse_datamodel(xml, initial_properties)
 		elif node_name == "state" or node_name == "parallel":
 			parsed_root_states.append(_parse_state_element(xml, node_name))
+
+	root_node.initial_expression_properties = initial_properties
 
 	if parsed_root_states.is_empty():
 		return OK
@@ -125,6 +130,48 @@ func _clear_existing_statechart_nodes(root_node: Node) -> void:
 		if child is StateChartState or child is Transition:
 			root_node.remove_child(child)
 			child.queue_free()
+
+
+func _parse_datamodel(xml: XMLParser, properties: Dictionary) -> void:
+	if xml.is_empty():
+		return
+
+	while xml.read() == OK:
+		match xml.get_node_type():
+			XMLParser.NODE_ELEMENT:
+				if xml.get_node_name() == "data":
+					var id := xml.get_named_attribute_value_safe("id")
+					var expr := xml.get_named_attribute_value_safe("expr")
+					if not id.is_empty():
+						properties[id] = _parse_value(expr)
+			XMLParser.NODE_ELEMENT_END:
+				if xml.get_node_name() == "datamodel":
+					return
+
+
+func _parse_value(expr: String) -> Variant:
+	expr = expr.strip_edges()
+	if expr.is_empty():
+		return null
+
+	# Handle strings in quotes
+	if (
+		(expr.begins_with("'") and expr.ends_with("'"))
+		or (expr.begins_with('"') and expr.ends_with('"'))
+	):
+		return expr.substr(1, expr.length() - 2)
+
+	# Handle boolean
+	if expr.to_lower() == "true":
+		return true
+	if expr.to_lower() == "false":
+		return false
+
+	# Handle numbers
+	if expr.is_valid_float():
+		return expr.to_float()
+
+	return expr
 
 
 func _parse_state_element(xml: XMLParser, element_name: String) -> ParsedState:

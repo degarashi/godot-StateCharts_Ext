@@ -32,10 +32,35 @@ func export_to_scxml(node: Node) -> String:
 		)
 	)
 
+	if node is StateChartExt:
+		_export_datamodel(node, xml_lines, 1)
+
 	_export_state(node, xml_lines, 1)
 
 	xml_lines.append("</scxml>")
 	return "\n".join(xml_lines)
+
+
+func _export_datamodel(node: StateChartExt, lines: Array[String], indent: int) -> void:
+	if node.initial_expression_properties.is_empty():
+		return
+
+	var spacing := "\t".repeat(indent)
+	lines.append("{s}<datamodel>".format({"s": spacing}))
+	for key in node.initial_expression_properties:
+		var val: Variant = node.initial_expression_properties[key]
+		var val_str := ""
+		if val is String or val is StringName:
+			val_str = "'%s'" % _escape_attr(String(val))
+		else:
+			val_str = _escape_attr(str(val))
+
+		lines.append(
+			'{s}\t<data id="{id}" expr="{expr}"/>'.format(
+				{"s": spacing, "id": _escape_attr(String(key)), "expr": val_str}
+			)
+		)
+	lines.append("{s}</datamodel>".format({"s": spacing}))
 
 
 ## Exports a state and its children recursively
