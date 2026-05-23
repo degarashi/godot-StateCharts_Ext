@@ -4,7 +4,6 @@ class_name StateChartScxmlImporter
 extends RefCounted
 
 const EXT_NAMESPACE_PREFIX := "statechart_ext"
-const DELAY_ATTR_NAME := "%s:delay_in_seconds" % EXT_NAMESPACE_PREFIX
 const NAME_ATTR_NAME := "%s:name" % EXT_NAMESPACE_PREFIX
 const GUARD_JSON_ATTR_NAME := "%s:guard_json" % EXT_NAMESPACE_PREFIX
 
@@ -236,7 +235,6 @@ func _parse_state_element(xml: XMLParser, element_name: String) -> ParsedState:
 								"cond",
 								"type",
 								NAME_ATTR_NAME,
-								DELAY_ATTR_NAME,
 								GUARD_JSON_ATTR_NAME
 							]
 						):
@@ -253,7 +251,7 @@ func _parse_state_element(xml: XMLParser, element_name: String) -> ParsedState:
 						xml.get_named_attribute_value_safe("target")
 					)
 					var trans_name_attr := xml.get_named_attribute_value_safe(NAME_ATTR_NAME)
-					var trans_delay := _parse_transition_delay(xml)
+					var trans_delay := "0.0"
 					var trans_guard := _parse_transition_guard_ast(xml)
 
 					if not xml.is_empty():
@@ -270,20 +268,32 @@ func _parse_state_element(xml: XMLParser, element_name: String) -> ParsedState:
 										break
 
 					for e in events:
+						var final_event := e
+						var final_delay := trans_delay
+
+						if e.contains("@"):
+							var parts := e.split("@")
+							final_event = parts[0]
+							# If trans_delay is default, use the one from the event name
+							if final_delay == "0.0" or final_delay == "":
+								final_delay = parts[1]
+
 						var trans_name := trans_name_attr
 						if trans_name.is_empty():
 							trans_name = _generate_transition_name(
-								e, xml.get_named_attribute_value_safe("target")
+								final_event, xml.get_named_attribute_value_safe("target")
 							)
 						elif events.size() > 1:
-							trans_name += "_" + e
+							trans_name += (
+								"_" + (final_event if not final_event.is_empty() else "Auto")
+							)
 
 						parsed.transitions.append(
 							ParsedTransition.new(
 								trans_name,
-								StringName(e),
+								StringName(final_event),
 								trans_target,
-								trans_delay,
+								final_delay,
 								trans_guard,
 								trans_meta
 							)
@@ -333,13 +343,6 @@ func _parse_transition_target(target_attr: String) -> StringName:
 			"Multiple SCXML transition targets are not supported yet. Using the first target."
 		)
 	return StringName(target_ids[0])
-
-
-func _parse_transition_delay(xml: XMLParser) -> String:
-	var delay_attr := xml.get_named_attribute_value_safe(DELAY_ATTR_NAME)
-	if not delay_attr.is_empty():
-		return delay_attr
-	return "0.0"
 
 
 func _parse_transition_guard_ast(xml: XMLParser) -> Dictionary:

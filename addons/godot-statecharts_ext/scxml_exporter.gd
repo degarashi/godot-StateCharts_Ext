@@ -5,7 +5,6 @@ extends RefCounted
 
 const EXT_NAMESPACE_PREFIX := "statechart_ext"
 const EXT_NAMESPACE_URI := "https://github.com/degarashi/godot-statecharts_ext/scxml"
-const DELAY_ATTR_NAME := "%s:delay_in_seconds" % EXT_NAMESPACE_PREFIX
 const NAME_ATTR_NAME := "%s:name" % EXT_NAMESPACE_PREFIX
 const GUARD_JSON_ATTR_NAME := "%s:guard_json" % EXT_NAMESPACE_PREFIX
 
@@ -291,13 +290,24 @@ func _export_transitions(state_node: Node, lines: Array[String], indent: int) ->
 		var events: Array[String] = group.events
 		var attrs: Array[String] = []
 
-		if not events.is_empty():
-			attrs.append('event="%s"' % _escape_attr(" ".join(events)))
+		var delay_str := String(key.delay).strip_edges().replace(" ", "")
+		var exported_events: Array[String] = []
+
+		if events.is_empty():
+			if delay_str != "0.0" and delay_str != "0":
+				exported_events.append("@" + delay_str)
+		else:
+			for e in events:
+				if delay_str != "0.0" and delay_str != "0":
+					exported_events.append(e + "@" + delay_str)
+				else:
+					exported_events.append(e)
+
+		if not exported_events.is_empty():
+			attrs.append('event="%s"' % _escape_attr(" ".join(exported_events)))
 
 		if not key.target.is_empty():
 			attrs.append('target="%s"' % _escape_attr(key.target))
-
-		attrs.append('%s="%s"' % [DELAY_ATTR_NAME, _escape_attr(key.delay)])
 
 		# If it's a combined transition, we don't really have a single Godot name.
 		# But we can try to restore the original name if there's only one.
