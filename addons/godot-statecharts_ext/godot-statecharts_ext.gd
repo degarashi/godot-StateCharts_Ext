@@ -10,6 +10,7 @@ const CAT = "ScExt_Gen"
 # ------------- [Private Variables] -------------
 var _fs_reloading := false
 var _import_plugin: RefCounted
+var _scxml_import_plugin: RefCounted
 var _transition_inspector_plugin: EditorInspectorPlugin
 var _statechart_ext_inspector_plugin: EditorInspectorPlugin
 
@@ -20,6 +21,9 @@ func _enter_tree() -> void:
 
 	_import_plugin = preload("scdef_import_plugin.gd").new()
 	add_import_plugin(_import_plugin)
+
+	_scxml_import_plugin = preload("scxml_import_plugin.gd").new()
+	add_import_plugin(_scxml_import_plugin)
 
 	# Wait for the editor to be fully ready before registration
 	_register_inspectors_delayed()
@@ -42,6 +46,10 @@ func _exit_tree() -> void:
 	if _import_plugin:
 		remove_import_plugin(_import_plugin)
 		_import_plugin = null
+
+	if _scxml_import_plugin:
+		remove_import_plugin(_scxml_import_plugin)
+		_scxml_import_plugin = null
 
 	if _transition_inspector_plugin:
 		remove_inspector_plugin(_transition_inspector_plugin)
