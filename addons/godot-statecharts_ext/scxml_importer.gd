@@ -249,11 +249,15 @@ func _parse_state_element(xml: XMLParser, element_name: String) -> ParsedState:
 								xml.get_attribute_value(i)
 							)
 
-					var trans_event := StringName(xml.get_named_attribute_value_safe("event"))
+					var event_attr := xml.get_named_attribute_value_safe("event")
+					var events := event_attr.split(" ", false)
+					if events.is_empty():
+						events = [""]
+
 					var trans_target := _parse_transition_target(
 						xml.get_named_attribute_value_safe("target")
 					)
-					var trans_name := _parse_transition_name(xml)
+					var trans_name_attr := xml.get_named_attribute_value_safe(NAME_ATTR_NAME)
 					var trans_delay := _parse_transition_delay(xml)
 					var trans_guard := _parse_transition_guard_ast(xml)
 
@@ -270,16 +274,26 @@ func _parse_state_element(xml: XMLParser, element_name: String) -> ParsedState:
 									if xml.get_node_name() == "transition":
 										break
 
-					parsed.transitions.append(
-						ParsedTransition.new(
-							trans_name,
-							trans_event,
-							trans_target,
-							trans_delay,
-							trans_guard,
-							trans_meta
+					for e in events:
+						var trans_name := trans_name_attr
+						if trans_name.is_empty():
+							trans_name = _generate_transition_name(
+								e, xml.get_named_attribute_value_safe("target")
+							)
+						elif events.size() > 1:
+							trans_name += "_" + e
+
+						parsed.transitions.append(
+							ParsedTransition.new(
+								trans_name,
+								StringName(e),
+								trans_target,
+								trans_delay,
+								trans_guard,
+								trans_meta
+							)
 						)
-					)
+
 				elif node_name.contains(":"):
 					# Likely foreign metadata (e.g. qt:editorinfo)
 					parsed.metadata[_sanitize_meta_key("tag:" + node_name)] = _extract_element_metadata(
@@ -304,14 +318,7 @@ func _extract_element_metadata(xml: XMLParser) -> Dictionary:
 	return meta
 
 
-func _parse_transition_name(xml: XMLParser) -> String:
-	var name_attr := xml.get_named_attribute_value_safe(NAME_ATTR_NAME)
-	if not name_attr.is_empty():
-		return name_attr
-
-	var event := xml.get_named_attribute_value_safe("event")
-	var target := xml.get_named_attribute_value_safe("target")
-
+func _generate_transition_name(event: String, target: String) -> String:
 	if not event.is_empty() and not target.is_empty():
 		return event.to_pascal_case() + "To" + target.to_pascal_case()
 	if not event.is_empty():
