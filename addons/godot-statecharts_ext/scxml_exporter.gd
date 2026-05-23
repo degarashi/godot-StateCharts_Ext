@@ -22,9 +22,14 @@ const AnyOfGuardScript := preload("res://addons/godot_state_charts/any_of_guard.
 
 const HistoryStateScript := preload("res://addons/godot_state_charts/history_state.gd")
 
+var _node_to_id: Dictionary[Node, String] = {}
+
 
 ## Exports the state chart to an SCXML string
 func export_to_scxml(node: Node) -> String:
+	_node_to_id.clear()
+	_assign_unique_ids(node)
+
 	var xml_lines: Array[String] = []
 	xml_lines.append('<?xml version="1.0" encoding="UTF-8"?>')
 
@@ -78,6 +83,26 @@ func export_to_scxml(node: Node) -> String:
 	return "\n".join(xml_lines)
 
 
+func _assign_unique_ids(node: Node) -> void:
+	var used_ids: Dictionary[String, bool] = {}
+	_assign_ids_recursive(node, used_ids)
+
+
+func _assign_ids_recursive(node: Node, used_ids: Dictionary) -> void:
+	if node is StateChartState:
+		var base_id := String(node.name)
+		var unique_id := base_id
+		var counter := 1
+		while used_ids.has(unique_id):
+			counter += 1
+			unique_id = base_id + "_" + str(counter)
+		_node_to_id[node] = unique_id
+		used_ids[unique_id] = true
+
+	for child in node.get_children():
+		_assign_ids_recursive(child, used_ids)
+
+
 func _collect_used_prefixes(node: Node, dst: Dictionary[String, bool]) -> void:
 	for meta_key in node.get_meta_list():
 		var parts: PackedStringArray
@@ -124,13 +149,15 @@ func _export_state(node: Node, lines: Array[String], indent: int) -> void:
 	if node is StateChartState:
 		var tag_name := _state_tag_name(node)
 		var state_attrs: Array[String] = []
-		state_attrs.append('id="%s"' % _escape_attr(node.name))
+		state_attrs.append('id="%s"' % _escape_attr(_node_to_id.get(node, node.name)))
 
 		# Initial state for compound states
 		if node is CompoundState:
 			var initial_node := node.get_node_or_null(node.initial_state)
 			if initial_node:
-				state_attrs.append('initial="%s"' % _escape_attr(initial_node.name))
+				state_attrs.append(
+					'initial="%s"' % _escape_attr(_node_to_id.get(initial_node, initial_node.name))
+				)
 
 		if node is HistoryStateScript:
 			var h_state := node as HistoryState
@@ -166,7 +193,10 @@ func _export_state(node: Node, lines: Array[String], indent: int) -> void:
 			var default_node = node.get_node_or_null((node as HistoryState).default_state)
 			if default_node:
 				extra_tags.append(
-					'%s\t<transition target="%s"/>' % [spacing, _escape_attr(default_node.name)]
+					(
+						'%s\t<transition target="%s"/>'
+						% [spacing, _escape_attr(_node_to_id.get(default_node, default_node.name))]
+					)
 				)
 
 		lines.append(
@@ -178,11 +208,11 @@ func _export_state(node: Node, lines: Array[String], indent: int) -> void:
 		for t in extra_tags:
 			lines.append(t)
 
+		_export_transitions(node, lines, indent + 1)
+
 		for child in node.get_children():
 			if child is StateChartState:
 				_export_state(child, lines, indent + 1)
-
-		_export_transitions(node, lines, indent + 1)
 
 		lines.append("{s}</{tag}>".format({"s": spacing, "tag": tag_name}))
 	elif node is StateChartExt:
@@ -213,7 +243,7 @@ func _export_transitions(state_node: Node, lines: Array[String], indent: int) ->
 		if t.to:
 			var target_node := t.get_node_or_null(t.to)
 			if target_node:
-				target = target_node.name
+				target = _node_to_id.get(target_node, target_node.name)
 
 		# Metadata & Extra tags
 		var attrs: Dictionary = {}
@@ -261,8 +291,12 @@ func _export_transitions(state_node: Node, lines: Array[String], indent: int) ->
 		var events: Array[String] = group.events
 		var attrs: Array[String] = []
 
-		attrs.append('event="%s"' % _escape_attr(" ".join(events)))
-		attrs.append('target="%s"' % _escape_attr(key.target))
+		if not events.is_empty():
+			attrs.append('event="%s"' % _escape_attr(" ".join(events)))
+
+		if not key.target.is_empty():
+			attrs.append('target="%s"' % _escape_attr(key.target))
+
 		attrs.append('%s="%s"' % [DELAY_ATTR_NAME, _escape_attr(key.delay)])
 
 		# If it's a combined transition, we don't really have a single Godot name.
@@ -346,7 +380,7 @@ func _guard_to_cond(guard: Guard, context_transition: Transition) -> String:
 	if guard is StateIsActiveGuardScript:
 		var target_node := context_transition.get_node_or_null(guard.state)
 		if target_node:
-			return "In('%s')" % target_node.name
+			return "In('%s')" % _node_to_id.get(target_node, target_node.name)
 		return "In('%s')" % String(guard.state)
 	if guard is NotGuardScript:
 		var inner := _guard_to_cond(guard.guard, context_transition)
