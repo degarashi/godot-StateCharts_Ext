@@ -151,8 +151,8 @@ func _export_state(node: Node, lines: Array[String], indent: int) -> void:
 		for child in node.get_children():
 			if child is StateChartState:
 				_export_state(child, lines, indent + 1)
-			elif child is Transition:
-				_export_transition(child, lines, indent + 1)
+
+		_export_transitions(node, lines, indent + 1)
 
 		lines.append("{s}</{tag}>".format({"s": spacing, "tag": tag_name}))
 	elif node is StateChartExt:
@@ -169,56 +169,112 @@ func _state_tag_name(node: StateChartState) -> String:
 	return "state"
 
 
-## Exports a transition
-func _export_transition(node: Transition, lines: Array[String], indent: int) -> void:
+## Exports transitions of a state, grouping identical ones
+func _export_transitions(state_node: Node, lines: Array[String], indent: int) -> void:
 	var spacing := "\t".repeat(indent)
-	var target := ""
-	if node.to:
-		var target_node := node.get_node_or_null(node.to)
-		if target_node:
-			target = target_node.name
+	var trans_groups: Array[Dictionary] = []  # Array of { "key": Dict, "events": Array[String] }
 
-	var attrs: Array[String] = []
-	attrs.append('event="%s"' % _escape_attr(String(node.event)))
-	attrs.append('target="%s"' % _escape_attr(target))
-	attrs.append('%s="%s"' % [DELAY_ATTR_NAME, _escape_attr(node.delay_in_seconds)])
-	attrs.append('%s="%s"' % [NAME_ATTR_NAME, _escape_attr(node.name)])
+	for child in state_node.get_children():
+		if not child is Transition:
+			continue
 
-	var guard_attrs := _export_guard_attrs(node)
-	for attr in guard_attrs:
-		attrs.append(attr)
+		var t := child as Transition
+		var target := ""
+		if t.to:
+			var target_node := t.get_node_or_null(t.to)
+			if target_node:
+				target = target_node.name
 
-	var extra_tags: Array[String] = []
-	for meta_key in node.get_meta_list():
-		if meta_key.begins_with("attr__"):
+		# Metadata & Extra tags
+		var attrs: Dictionary = {}
+		var extra_tags: Array[String] = []
+		for meta_key in t.get_meta_list():
+			if meta_key.begins_with("attr__"):
+				attrs[_desanitize_meta_key(meta_key.substr(6))] = str(t.get_meta(meta_key))
+			elif meta_key.begins_with("tag__"):
+				var tag_info: Dictionary = t.get_meta(meta_key)
+				var tag_full_name := _desanitize_meta_key(meta_key.substr(5))
+				var tag_attrs: Array[String] = []
+				for k in tag_info:
+					tag_attrs.append('%s="%s"' % [k, _escape_attr(str(tag_info[k]))])
+				extra_tags.append(
+					"\t<{tag} {attrs}/>".format(
+						{"tag": tag_full_name, "attrs": " ".join(tag_attrs)}
+					)
+				)
+
+		var group_key := {
+			"target": target,
+			"delay": t.delay_in_seconds,
+			"guard_cond": _guard_to_cond(t.guard, t),
+			"guard_ast": _guard_to_ast(t.guard, t),
+			"attrs": attrs,
+			"extra_tags": extra_tags
+		}
+
+		var found := false
+		for group in trans_groups:
+			if _is_same_group(group.key, group_key):
+				if not String(t.event).is_empty():
+					group.events.append(String(t.event))
+				found = true
+				break
+
+		if not found:
+			var events: Array[String] = []
+			if not String(t.event).is_empty():
+				events.append(String(t.event))
+			trans_groups.append({"key": group_key, "events": events, "original_name": t.name})  # Use first transition's name if not combined
+
+	for group in trans_groups:
+		var key: Dictionary = group.key
+		var events: Array[String] = group.events
+		var attrs: Array[String] = []
+
+		attrs.append('event="%s"' % _escape_attr(" ".join(events)))
+		attrs.append('target="%s"' % _escape_attr(key.target))
+		attrs.append('%s="%s"' % [DELAY_ATTR_NAME, _escape_attr(key.delay)])
+
+		# If it's a combined transition, we don't really have a single Godot name.
+		# But we can try to restore the original name if there's only one.
+		if events.size() <= 1:
+			attrs.append('%s="%s"' % [NAME_ATTR_NAME, _escape_attr(group.original_name)])
+
+		if not key.guard_cond.is_empty():
+			attrs.append('cond="%s"' % _escape_attr(key.guard_cond))
+		if not key.guard_ast.is_empty():
 			attrs.append(
-				(
-					'%s="%s"'
-					% [
-						_desanitize_meta_key(meta_key.substr(6)),
-						_escape_attr(str(node.get_meta(meta_key)))
-					]
-				)
-			)
-		elif meta_key.begins_with("tag__"):
-			var tag_info: Dictionary = node.get_meta(meta_key)
-			var tag_full_name := _desanitize_meta_key(meta_key.substr(5))
-			var tag_attrs: Array[String] = []
-			for k in tag_info:
-				tag_attrs.append('%s="%s"' % [k, _escape_attr(str(tag_info[k]))])
-			extra_tags.append(
-				"{s}\t<{tag} {attrs}/>".format(
-					{"s": spacing, "tag": tag_full_name, "attrs": " ".join(tag_attrs)}
-				)
+				'%s="%s"' % [GUARD_JSON_ATTR_NAME, _escape_attr(JSON.stringify(key.guard_ast))]
 			)
 
-	if extra_tags.is_empty():
-		lines.append("{s}<transition {attrs}/>".format({"s": spacing, "attrs": " ".join(attrs)}))
-	else:
-		lines.append("{s}<transition {attrs}>".format({"s": spacing, "attrs": " ".join(attrs)}))
-		for t in extra_tags:
-			lines.append(t)
-		lines.append("{s}</transition>".format({"s": spacing}))
+		for attr_name in key.attrs:
+			attrs.append('%s="%s"' % [attr_name, _escape_attr(key.attrs[attr_name])])
+
+		if key.extra_tags.is_empty():
+			lines.append(
+				"{s}<transition {attrs}/>".format({"s": spacing, "attrs": " ".join(attrs)})
+			)
+		else:
+			lines.append("{s}<transition {attrs}>".format({"s": spacing, "attrs": " ".join(attrs)}))
+			for tag in key.extra_tags:
+				lines.append(spacing + tag)
+			lines.append("{s}</transition>".format({"s": spacing}))
+
+
+func _is_same_group(a: Dictionary, b: Dictionary) -> bool:
+	if a.target != b.target:
+		return false
+	if a.delay != b.delay:
+		return false
+	if a.guard_cond != b.guard_cond:
+		return false
+	if str(a.guard_ast) != str(b.guard_ast):
+		return false
+	if str(a.attrs) != str(b.attrs):
+		return false
+	if str(a.extra_tags) != str(b.extra_tags):
+		return false
+	return true
 
 
 func _export_guard_attrs(node: Transition) -> Array[String]:
