@@ -19,6 +19,17 @@ This extension provides a statically typed wrapper to make state machine paramet
     - **Check Errors Button**: A handy button in the inspector to trigger a full validation pass.
 - **Debug Tools**: Toggleable logs for state transitions (`debug_log`) and event reception (`debug_event`).
 
+## SCXML Integration
+
+This plugin provides professional-grade SCXML import/export capabilities, allowing seamless integration with external editors like Qt Creator.
+
+- **Advanced Round-Trip**: Metadata (including `qt:editorinfo`), custom attributes, and namespaced tags are fully preserved.
+- **History States**: Supports SCXML `<history>` tags (both `shallow` and `deep`) mapped to Godot's `HistoryState`.
+- **Intelligent Transition Handling**:
+    *   **Multiple Events**: Automatically splits space-separated events into multiple nodes on import, and merges them back into a single element on export.
+    *   **Descriptive Naming**: Auto-generates readable node names (e.g., `JumpToAirborne`) for new transitions without explicit names.
+- **Custom Namespaces**: All `xmlns` declarations are captured and restored, ensuring compatibility with any 3rd party tool.
+
 ## Installation
 
 - Ensure you have [godot-statecharts](https://github.com/derkork/godot-statecharts) installed and enabled in your project.
