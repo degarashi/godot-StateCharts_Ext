@@ -33,21 +33,34 @@ func export_to_scxml(node: Node) -> String:
 		"xmlns:" + EXT_NAMESPACE_PREFIX: EXT_NAMESPACE_URI
 	}
 
+	# Scan for all used prefixes in the tree to ensure they are declared
+	var used_prefixes: Dictionary[String, bool] = {}
+	_collect_used_prefixes(node, used_prefixes)
+	if used_prefixes.has(QT_NAMESPACE_PREFIX):
+		namespaces["xmlns:" + QT_NAMESPACE_PREFIX] = QT_NAMESPACE_URI
+
 	# Detect extra namespaces from metadata
 	var root_attrs: Array[String] = []
 	for meta_key in node.get_meta_list():
 		if meta_key.contains("__"):
 			var desanitized_key := _desanitize_meta_key(meta_key)
 			var parts := desanitized_key.split(":")
+
+			# If it's a namespace declaration, add to namespaces dict to avoid duplicates
+			if parts.size() == 2 and parts[0] == "xmlns":
+				namespaces[desanitized_key] = str(node.get_meta(meta_key))
+				continue
+
 			if parts.size() == 2:
-				if parts[0] == QT_NAMESPACE_PREFIX:
-					namespaces["xmlns:" + QT_NAMESPACE_PREFIX] = QT_NAMESPACE_URI
 				root_attrs.append(
 					'%s="%s"' % [desanitized_key, _escape_attr(str(node.get_meta(meta_key)))]
 				)
 
 	var ns_parts: Array[String] = []
-	for ns in namespaces:
+	# Sort keys for deterministic output
+	var ns_keys := namespaces.keys()
+	ns_keys.sort()
+	for ns in ns_keys:
 		ns_parts.append('%s="%s"' % [ns, namespaces[ns]])
 
 	xml_lines.append(
@@ -63,6 +76,23 @@ func export_to_scxml(node: Node) -> String:
 
 	xml_lines.append("</scxml>")
 	return "\n".join(xml_lines)
+
+
+func _collect_used_prefixes(node: Node, dst: Dictionary[String, bool]) -> void:
+	for meta_key in node.get_meta_list():
+		var parts: PackedStringArray
+		if meta_key.begins_with("attr__"):
+			parts = _desanitize_meta_key(meta_key.substr(6)).split(":")
+		elif meta_key.begins_with("tag__"):
+			parts = _desanitize_meta_key(meta_key.substr(5)).split(":")
+		elif meta_key.contains("__"):
+			parts = _desanitize_meta_key(meta_key).split(":")
+
+		if parts.size() == 2 and parts[0] != "xmlns":
+			dst[parts[0]] = true
+
+	for child in node.get_children():
+		_collect_used_prefixes(child, dst)
 
 
 func _export_datamodel(node: StateChartExt, lines: Array[String], indent: int) -> void:

@@ -120,12 +120,7 @@ func import_scxml(path: String, root_node: Node) -> Error:
 			# Store root attributes as metadata
 			for i in range(xml.get_attribute_count()):
 				var attr_name := xml.get_attribute_name(i)
-				if (
-					attr_name != "initial"
-					and attr_name != "name"
-					and attr_name != "version"
-					and attr_name != "xmlns"
-				):
+				if attr_name != "initial" and attr_name != "name" and attr_name != "version":
 					root_node.set_meta(_sanitize_meta_key(attr_name), xml.get_attribute_value(i))
 
 		elif node_name == "datamodel":
