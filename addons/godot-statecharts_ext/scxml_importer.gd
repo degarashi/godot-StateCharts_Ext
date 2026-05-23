@@ -61,15 +61,22 @@ class ParsedState:
 		metadata = metadata_a
 
 
+const HistoryStateScript := preload("res://addons/godot_state_charts/history_state.gd")
+
+
 class PendingTransition:
-	var node: Transition
+	var node: Node  # Can be Transition or HistoryState
 	var target_id: StringName
 	var guard_ast: Dictionary
+	var is_history_default := false
 
-	func _init(node_a: Transition, target_id_a: StringName, guard_ast_a: Dictionary = {}) -> void:
+	func _init(
+		node_a: Node, target_id_a: StringName, guard_ast_a: Dictionary = {}, is_hist: bool = false
+	) -> void:
 		node = node_a
 		target_id = target_id_a
 		guard_ast = guard_ast_a
+		is_history_default = is_hist
 
 
 func _set_owner(node: Node, owner_node: Node) -> void:
@@ -123,7 +130,7 @@ func import_scxml(path: String, root_node: Node) -> Error:
 
 		elif node_name == "datamodel":
 			_parse_datamodel(xml, initial_properties)
-		elif node_name == "state" or node_name == "parallel":
+		elif node_name == "state" or node_name == "parallel" or node_name == "history":
 			parsed_root_states.append(_parse_state_element(xml, node_name))
 
 	root_node.initial_expression_properties = initial_properties
@@ -220,7 +227,7 @@ func _parse_state_element(xml: XMLParser, element_name: String) -> ParsedState:
 		match xml.get_node_type():
 			XMLParser.NODE_ELEMENT:
 				var node_name := xml.get_node_name()
-				if node_name == "state" or node_name == "parallel":
+				if node_name == "state" or node_name == "parallel" or node_name == "history":
 					parsed.children.append(_parse_state_element(xml, node_name))
 				elif node_name == "transition":
 					var trans_meta := {}
@@ -456,10 +463,22 @@ func _instantiate_state_tree(
 	for key in parsed.metadata:
 		state_node.set_meta(key, parsed.metadata[key])
 
+	if state_node is HistoryStateScript:
+		var h_state := state_node as HistoryState
+		var type_meta = parsed.metadata.get(_sanitize_meta_key("attr:type"), "shallow")
+		h_state.deep = (type_meta == "deep")
+
 	for child_parsed in parsed.children:
 		_instantiate_state_tree(child_parsed, state_node, state_by_id, pending_transitions)
 
 	for parsed_transition in parsed.transitions:
+		if state_node is HistoryStateScript:
+			# Transitions in history are default targets
+			pending_transitions.append(
+				PendingTransition.new(state_node, parsed_transition.target_id, {}, true)
+			)
+			continue
+
 		var transition := Transition.new()
 		transition.name = parsed_transition.name
 		transition.event = parsed_transition.event
@@ -487,6 +506,8 @@ func _create_state_node(parsed: ParsedState) -> StateChartState:
 	var state_node: StateChartState
 	if parsed.kind == &"parallel":
 		state_node = ParallelState.new()
+	elif parsed.kind == &"history":
+		state_node = HistoryStateScript.new()
 	elif parsed.children.is_empty():
 		state_node = AtomicState.new()
 	else:
@@ -535,6 +556,14 @@ func _resolve_pending_transitions(
 				"Transition target '%s' was not found in imported SCXML." % pending.target_id
 			)
 			continue
+
+		if pending.is_history_default:
+			if target_state != null:
+				(pending.node as HistoryState).default_state = pending.node.get_path_to(
+					target_state
+				)
+			continue
+
 		if target_state != null:
 			pending.node.to = pending.node.get_path_to(target_state)
 		pending.node.guard = _guard_from_ast(pending.guard_ast, pending.node, state_by_id)

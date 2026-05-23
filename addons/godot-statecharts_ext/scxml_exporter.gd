@@ -20,6 +20,8 @@ const NotGuardScript := preload("res://addons/godot_state_charts/not_guard.gd")
 const AllOfGuardScript := preload("res://addons/godot_state_charts/all_of_guard.gd")
 const AnyOfGuardScript := preload("res://addons/godot_state_charts/any_of_guard.gd")
 
+const HistoryStateScript := preload("res://addons/godot_state_charts/history_state.gd")
+
 
 ## Exports the state chart to an SCXML string
 func export_to_scxml(node: Node) -> String:
@@ -100,6 +102,12 @@ func _export_state(node: Node, lines: Array[String], indent: int) -> void:
 			if initial_node:
 				state_attrs.append('initial="%s"' % _escape_attr(initial_node.name))
 
+		if node is HistoryStateScript:
+			var h_state := node as HistoryState
+			# Only add type if not already in metadata as attr__type
+			if not node.has_meta("attr__type"):
+				state_attrs.append('type="%s"' % ("deep" if h_state.deep else "shallow"))
+
 		var extra_tags: Array[String] = []
 		for meta_key in node.get_meta_list():
 			if meta_key.begins_with("attr__"):
@@ -122,6 +130,13 @@ func _export_state(node: Node, lines: Array[String], indent: int) -> void:
 					"{s}\t<{tag} {attrs}/>".format(
 						{"s": spacing, "tag": tag_full_name, "attrs": " ".join(tag_attrs)}
 					)
+				)
+
+		if node is HistoryStateScript:
+			var default_node = node.get_node_or_null((node as HistoryState).default_state)
+			if default_node:
+				extra_tags.append(
+					'%s\t<transition target="%s"/>' % [spacing, _escape_attr(default_node.name)]
 				)
 
 		lines.append(
@@ -149,6 +164,8 @@ func _export_state(node: Node, lines: Array[String], indent: int) -> void:
 func _state_tag_name(node: StateChartState) -> String:
 	if node is ParallelState:
 		return "parallel"
+	if node is HistoryStateScript:
+		return "history"
 	return "state"
 
 
