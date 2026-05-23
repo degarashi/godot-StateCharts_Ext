@@ -23,19 +23,22 @@ class ParsedTransition:
 	var target_id: StringName
 	var delay_in_seconds: String
 	var guard_ast: Dictionary
+	var metadata: Dictionary
 
 	func _init(
 		name_a: String = "Transition",
 		event_a: StringName = &"",
 		target_id_a: StringName = &"",
 		delay_in_seconds_a: String = "0.0",
-		guard_ast_a: Dictionary = {}
+		guard_ast_a: Dictionary = {},
+		metadata_a: Dictionary = {}
 	) -> void:
 		name = name_a
 		event = event_a
 		target_id = target_id_a
 		delay_in_seconds = delay_in_seconds_a
 		guard_ast = guard_ast_a
+		metadata = metadata_a
 
 
 class ParsedState:
@@ -44,13 +47,18 @@ class ParsedState:
 	var initial_id: StringName
 	var children: Array[ParsedState] = []
 	var transitions: Array[ParsedTransition] = []
+	var metadata: Dictionary
 
 	func _init(
-		id_a: StringName = &"", kind_a: StringName = &"state", initial_id_a: StringName = &""
+		id_a: StringName = &"",
+		kind_a: StringName = &"state",
+		initial_id_a: StringName = &"",
+		metadata_a: Dictionary = {}
 	) -> void:
 		id = id_a
 		kind = kind_a
 		initial_id = initial_id_a
+		metadata = metadata_a
 
 
 class PendingTransition:
@@ -101,6 +109,18 @@ func import_scxml(path: String, root_node: Node) -> Error:
 			var scxml_name_attr := xml.get_named_attribute_value_safe("name")
 			if not scxml_name_attr.is_empty():
 				scxml_name = StringName(scxml_name_attr)
+
+			# Store root attributes as metadata
+			for i in range(xml.get_attribute_count()):
+				var attr_name := xml.get_attribute_name(i)
+				if (
+					attr_name != "initial"
+					and attr_name != "name"
+					and attr_name != "version"
+					and attr_name != "xmlns"
+				):
+					root_node.set_meta(_sanitize_meta_key(attr_name), xml.get_attribute_value(i))
+
 		elif node_name == "datamodel":
 			_parse_datamodel(xml, initial_properties)
 		elif node_name == "state" or node_name == "parallel":
@@ -187,6 +207,12 @@ func _parse_state_element(xml: XMLParser, element_name: String) -> ParsedState:
 		StringName(xml.get_named_attribute_value_safe("initial"))
 	)
 
+	# Store state attributes as metadata (excluding standard ones)
+	for i in range(xml.get_attribute_count()):
+		var attr_name := xml.get_attribute_name(i)
+		if attr_name != "id" and attr_name != "name" and attr_name != "initial":
+			parsed.metadata[_sanitize_meta_key("attr:" + attr_name)] = xml.get_attribute_value(i)
+
 	if xml.is_empty():
 		return parsed
 
@@ -197,15 +223,62 @@ func _parse_state_element(xml: XMLParser, element_name: String) -> ParsedState:
 				if node_name == "state" or node_name == "parallel":
 					parsed.children.append(_parse_state_element(xml, node_name))
 				elif node_name == "transition":
+					var trans_meta := {}
+					for i in range(xml.get_attribute_count()):
+						var attr_name := xml.get_attribute_name(i)
+						if not (
+							attr_name
+							in [
+								"event",
+								"target",
+								"cond",
+								"type",
+								NAME_ATTR_NAME,
+								DELAY_ATTR_NAME,
+								GUARD_JSON_ATTR_NAME
+							]
+						):
+							trans_meta[_sanitize_meta_key("attr:" + attr_name)] = (
+								xml.get_attribute_value(i)
+							)
+
+					var trans_event := StringName(xml.get_named_attribute_value_safe("event"))
+					var trans_target := _parse_transition_target(
+						xml.get_named_attribute_value_safe("target")
+					)
+					var trans_name := _parse_transition_name(xml)
+					var trans_delay := _parse_transition_delay(xml)
+					var trans_guard := _parse_transition_guard_ast(xml)
+
+					if not xml.is_empty():
+						while xml.read() == OK:
+							match xml.get_node_type():
+								XMLParser.NODE_ELEMENT:
+									var t_node_name := xml.get_node_name()
+									if t_node_name.contains(":"):
+										trans_meta[_sanitize_meta_key("tag:" + t_node_name)] = (_extract_element_metadata(
+											xml
+										))
+								XMLParser.NODE_ELEMENT_END:
+									if xml.get_node_name() == "transition":
+										break
+
 					parsed.transitions.append(
 						ParsedTransition.new(
-							_parse_transition_name(xml),
-							StringName(xml.get_named_attribute_value_safe("event")),
-							_parse_transition_target(xml.get_named_attribute_value_safe("target")),
-							_parse_transition_delay(xml),
-							_parse_transition_guard_ast(xml)
+							trans_name,
+							trans_event,
+							trans_target,
+							trans_delay,
+							trans_guard,
+							trans_meta
 						)
 					)
+				elif node_name.contains(":"):
+					# Likely foreign metadata (e.g. qt:editorinfo)
+					parsed.metadata[_sanitize_meta_key("tag:" + node_name)] = _extract_element_metadata(
+						xml
+					)
+
 			XMLParser.NODE_ELEMENT_END:
 				if xml.get_node_name() == element_name:
 					return parsed
@@ -213,10 +286,32 @@ func _parse_state_element(xml: XMLParser, element_name: String) -> ParsedState:
 	return parsed
 
 
+func _sanitize_meta_key(key: String) -> String:
+	return key.replace(":", "__")
+
+
+func _extract_element_metadata(xml: XMLParser) -> Dictionary:
+	var meta := {}
+	for i in range(xml.get_attribute_count()):
+		meta[xml.get_attribute_name(i)] = xml.get_attribute_value(i)
+	return meta
+
+
 func _parse_transition_name(xml: XMLParser) -> String:
 	var name_attr := xml.get_named_attribute_value_safe(NAME_ATTR_NAME)
 	if not name_attr.is_empty():
 		return name_attr
+
+	var event := xml.get_named_attribute_value_safe("event")
+	var target := xml.get_named_attribute_value_safe("target")
+
+	if not event.is_empty() and not target.is_empty():
+		return event.to_pascal_case() + "To" + target.to_pascal_case()
+	if not event.is_empty():
+		return event.to_pascal_case()
+	if not target.is_empty():
+		return "To" + target.to_pascal_case()
+
 	return "Transition"
 
 
@@ -357,6 +452,10 @@ func _instantiate_state_tree(
 		)
 	state_by_id[parsed.id] = state_node
 
+	# Apply metadata to state node
+	for key in parsed.metadata:
+		state_node.set_meta(key, parsed.metadata[key])
+
 	for child_parsed in parsed.children:
 		_instantiate_state_tree(child_parsed, state_node, state_by_id, pending_transitions)
 
@@ -365,6 +464,11 @@ func _instantiate_state_tree(
 		transition.name = parsed_transition.name
 		transition.event = parsed_transition.event
 		transition.delay_in_seconds = parsed_transition.delay_in_seconds
+
+		# Apply metadata to transition node
+		for key in parsed_transition.metadata:
+			transition.set_meta(key, parsed_transition.metadata[key])
+
 		state_node.add_child(transition)
 		_set_owner(transition, state_node.owner if state_node.owner else state_node)
 		pending_transitions.append(

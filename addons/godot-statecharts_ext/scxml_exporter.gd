@@ -9,6 +9,9 @@ const DELAY_ATTR_NAME := "%s:delay_in_seconds" % EXT_NAMESPACE_PREFIX
 const NAME_ATTR_NAME := "%s:name" % EXT_NAMESPACE_PREFIX
 const GUARD_JSON_ATTR_NAME := "%s:guard_json" % EXT_NAMESPACE_PREFIX
 
+const QT_NAMESPACE_PREFIX := "qt"
+const QT_NAMESPACE_URI := "http://www.qt.io/2015/02/scxml-ext"
+
 const ExpressionGuardScript := preload("res://addons/godot_state_charts/expression_guard.gd")
 const StateIsActiveGuardScript := preload(
 	"res://addons/godot_state_charts/state_is_active_guard.gd"
@@ -22,13 +25,32 @@ const AnyOfGuardScript := preload("res://addons/godot_state_charts/any_of_guard.
 func export_to_scxml(node: Node) -> String:
 	var xml_lines: Array[String] = []
 	xml_lines.append('<?xml version="1.0" encoding="UTF-8"?>')
-	(
-		xml_lines
-		. append(
-			(
-				'<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:{prefix}="{uri}" version="1.0" profile="ecmascript">'
-				. format({"prefix": EXT_NAMESPACE_PREFIX, "uri": EXT_NAMESPACE_URI})
-			)
+
+	var namespaces: Dictionary[String, String] = {
+		"xmlns": "http://www.w3.org/2005/07/scxml",
+		"xmlns:" + EXT_NAMESPACE_PREFIX: EXT_NAMESPACE_URI
+	}
+
+	# Detect extra namespaces from metadata
+	var root_attrs: Array[String] = []
+	for meta_key in node.get_meta_list():
+		if meta_key.contains("__"):
+			var desanitized_key := _desanitize_meta_key(meta_key)
+			var parts := desanitized_key.split(":")
+			if parts.size() == 2:
+				if parts[0] == QT_NAMESPACE_PREFIX:
+					namespaces["xmlns:" + QT_NAMESPACE_PREFIX] = QT_NAMESPACE_URI
+				root_attrs.append(
+					'%s="%s"' % [desanitized_key, _escape_attr(str(node.get_meta(meta_key)))]
+				)
+
+	var ns_parts: Array[String] = []
+	for ns in namespaces:
+		ns_parts.append('%s="%s"' % [ns, namespaces[ns]])
+
+	xml_lines.append(
+		'<scxml {ns} version="1.0" profile="ecmascript" {attrs}>'.format(
+			{"ns": " ".join(ns_parts), "attrs": " ".join(root_attrs)}
 		)
 	)
 
@@ -69,11 +91,47 @@ func _export_state(node: Node, lines: Array[String], indent: int) -> void:
 
 	if node is StateChartState:
 		var tag_name := _state_tag_name(node)
+		var state_attrs: Array[String] = []
+		state_attrs.append('id="%s"' % _escape_attr(node.name))
+
+		# Initial state for compound states
+		if node is CompoundState:
+			var initial_node := node.get_node_or_null(node.initial_state)
+			if initial_node:
+				state_attrs.append('initial="%s"' % _escape_attr(initial_node.name))
+
+		var extra_tags: Array[String] = []
+		for meta_key in node.get_meta_list():
+			if meta_key.begins_with("attr__"):
+				state_attrs.append(
+					(
+						'%s="%s"'
+						% [
+							_desanitize_meta_key(meta_key.substr(6)),
+							_escape_attr(str(node.get_meta(meta_key)))
+						]
+					)
+				)
+			elif meta_key.begins_with("tag__"):
+				var tag_info: Dictionary = node.get_meta(meta_key)
+				var tag_full_name := _desanitize_meta_key(meta_key.substr(5))
+				var tag_attrs: Array[String] = []
+				for k in tag_info:
+					tag_attrs.append('%s="%s"' % [k, _escape_attr(str(tag_info[k]))])
+				extra_tags.append(
+					"{s}\t<{tag} {attrs}/>".format(
+						{"s": spacing, "tag": tag_full_name, "attrs": " ".join(tag_attrs)}
+					)
+				)
+
 		lines.append(
-			'{s}<{tag} id="{id}">'.format(
-				{"s": spacing, "tag": tag_name, "id": _escape_attr(node.name)}
+			"{s}<{tag} {attrs}>".format(
+				{"s": spacing, "tag": tag_name, "attrs": " ".join(state_attrs)}
 			)
 		)
+
+		for t in extra_tags:
+			lines.append(t)
 
 		for child in node.get_children():
 			if child is StateChartState:
@@ -113,7 +171,37 @@ func _export_transition(node: Transition, lines: Array[String], indent: int) -> 
 	for attr in guard_attrs:
 		attrs.append(attr)
 
-	lines.append("{s}<transition {attrs}/>".format({"s": spacing, "attrs": " ".join(attrs)}))
+	var extra_tags: Array[String] = []
+	for meta_key in node.get_meta_list():
+		if meta_key.begins_with("attr__"):
+			attrs.append(
+				(
+					'%s="%s"'
+					% [
+						_desanitize_meta_key(meta_key.substr(6)),
+						_escape_attr(str(node.get_meta(meta_key)))
+					]
+				)
+			)
+		elif meta_key.begins_with("tag__"):
+			var tag_info: Dictionary = node.get_meta(meta_key)
+			var tag_full_name := _desanitize_meta_key(meta_key.substr(5))
+			var tag_attrs: Array[String] = []
+			for k in tag_info:
+				tag_attrs.append('%s="%s"' % [k, _escape_attr(str(tag_info[k]))])
+			extra_tags.append(
+				"{s}\t<{tag} {attrs}/>".format(
+					{"s": spacing, "tag": tag_full_name, "attrs": " ".join(tag_attrs)}
+				)
+			)
+
+	if extra_tags.is_empty():
+		lines.append("{s}<transition {attrs}/>".format({"s": spacing, "attrs": " ".join(attrs)}))
+	else:
+		lines.append("{s}<transition {attrs}>".format({"s": spacing, "attrs": " ".join(attrs)}))
+		for t in extra_tags:
+			lines.append(t)
+		lines.append("{s}</transition>".format({"s": spacing}))
 
 
 func _export_guard_attrs(node: Transition) -> Array[String]:
@@ -217,6 +305,10 @@ func _escape_attr(value: String) -> String:
 	return value.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(
 		">", "&gt;"
 	)
+
+
+func _desanitize_meta_key(key: String) -> String:
+	return key.replace("__", ":")
 
 
 ## Exports to file
