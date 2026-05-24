@@ -6,6 +6,8 @@ extends RefCounted
 const EXT_NAMESPACE_PREFIX := "statechart_ext"
 const NAME_ATTR_NAME := "%s:name" % EXT_NAMESPACE_PREFIX
 const GUARD_JSON_ATTR_NAME := "%s:guard_json" % EXT_NAMESPACE_PREFIX
+const UID_ATTR_NAME := "%s:uid" % EXT_NAMESPACE_PREFIX
+const UID_META_KEY := "statechart_ext__uid"
 
 const ExpressionGuardScript := preload("res://addons/godot_state_charts/expression_guard.gd")
 const StateIsActiveGuardScript := preload(
@@ -221,7 +223,9 @@ func _parse_state_element(xml: XMLParser, element_name: String) -> ParsedState:
 	# Store state attributes as metadata (excluding standard ones)
 	for i in range(xml.get_attribute_count()):
 		var attr_name := xml.get_attribute_name(i)
-		if attr_name != "id" and attr_name != "name" and attr_name != "initial":
+		if attr_name == UID_ATTR_NAME:
+			parsed.metadata[UID_META_KEY] = xml.get_attribute_value(i)
+		elif attr_name != "id" and attr_name != "name" and attr_name != "initial":
 			parsed.metadata[_sanitize_meta_key("attr:" + attr_name)] = xml.get_attribute_value(i)
 
 	if xml.is_empty():
@@ -647,8 +651,22 @@ func _save_connections(root_node: Node) -> Array:
 	return saved
 
 
+func _collect_uids_recursive(node: Node, dst: Dictionary[String, Node]) -> void:
+	if node.has_meta(UID_META_KEY):
+		var uid := str(node.get_meta(UID_META_KEY))
+		if not uid.is_empty():
+			dst[uid] = node
+
+	for child in node.get_children():
+		_collect_uids_recursive(child, dst)
+
+
 func _collect_connections_recursive(node: Node, root_node: Node, saved: Array) -> void:
 	var rel_path := root_node.get_path_to(node)
+	var uid := ""
+	if node.has_meta(UID_META_KEY):
+		uid = str(node.get_meta(UID_META_KEY))
+
 	var internal_methods := [
 		"_on_state_entered_context",
 		"_on_state_exited_cleanup",
@@ -671,6 +689,7 @@ func _collect_connections_recursive(node: Node, root_node: Node, saved: Array) -
 			saved.append(
 				{
 					"source_path": rel_path,
+					"source_uid": uid,
 					"signal_name": sig_name,
 					"callable": callable,
 					"flags": conn["flags"]
@@ -682,8 +701,22 @@ func _collect_connections_recursive(node: Node, root_node: Node, saved: Array) -
 
 
 func _restore_connections(root_node: Node, saved: Array) -> void:
+	# Build a UID to Node map for fast lookup
+	var uid_to_node: Dictionary[String, Node] = {}
+	_collect_uids_recursive(root_node, uid_to_node)
+
 	for data in saved:
-		var source := root_node.get_node_or_null(data["source_path"])
+		var source: Node = null
+
+		# Try restoring by UID first
+		var s_uid = data.get("source_uid", "")
+		if not str(s_uid).is_empty():
+			source = uid_to_node.get(str(s_uid))
+
+		# Fallback to path if UID lookup failed or node doesn't have a UID
+		if not source:
+			source = root_node.get_node_or_null(data["source_path"])
+
 		if not source:
 			continue
 

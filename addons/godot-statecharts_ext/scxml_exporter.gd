@@ -21,13 +21,19 @@ const AnyOfGuardScript := preload("res://addons/godot_state_charts/any_of_guard.
 
 const HistoryStateScript := preload("res://addons/godot_state_charts/history_state.gd")
 
+const UID_ATTR_NAME := "%s:uid" % EXT_NAMESPACE_PREFIX
+const UID_META_KEY := "statechart_ext__uid"
+
 var _node_to_id: Dictionary[Node, String] = {}
+var _node_to_uid: Dictionary[Node, String] = {}
 
 
 ## Exports the state chart to an SCXML string
 func export_to_scxml(node: Node) -> String:
 	_node_to_id.clear()
+	_node_to_uid.clear()
 	_assign_unique_ids(node)
+	_ensure_and_collect_uids(node)
 
 	var xml_lines: Array[String] = []
 	xml_lines.append('<?xml version="1.0" encoding="UTF-8"?>')
@@ -80,6 +86,30 @@ func export_to_scxml(node: Node) -> String:
 
 	xml_lines.append("</scxml>")
 	return "\n".join(xml_lines)
+
+
+func _ensure_and_collect_uids(node: Node) -> void:
+	if node is StateChartState:
+		var uid: String = ""
+		# We look for metadata that would be exported as the UID attribute
+		if node.has_meta(UID_META_KEY):
+			uid = str(node.get_meta(UID_META_KEY))
+
+		if uid.is_empty():
+			# Generate a simple unique ID if missing.
+			# In a real scenario, a UUID would be better, but this works for local roundtrips.
+			uid = (
+				"uid_"
+				+ str(Time.get_unix_time_from_system()).replace(".", "_")
+				+ "_"
+				+ str(node.get_instance_id())
+			)
+			node.set_meta(UID_META_KEY, uid)
+
+		_node_to_uid[node] = uid
+
+	for child in node.get_children():
+		_ensure_and_collect_uids(child)
 
 
 func _assign_unique_ids(node: Node) -> void:
@@ -163,6 +193,10 @@ func _export_state(node: Node, lines: Array[String], indent: int) -> void:
 			# Only add type if not already in metadata as attr__type
 			if not node.has_meta("attr__type"):
 				state_attrs.append('type="%s"' % ("deep" if h_state.deep else "shallow"))
+
+		# Add UID to attributes
+		if _node_to_uid.has(node):
+			state_attrs.append('%s="%s"' % [UID_ATTR_NAME, _escape_attr(_node_to_uid[node])])
 
 		var extra_tags: Array[String] = []
 		for meta_key in node.get_meta_list():
