@@ -145,6 +145,8 @@ func import_scxml(path: String, root_node: Node) -> Error:
 		var pending_transitions: Array[PendingTransition] = []
 
 		if parsed_root_states.size() == 1:
+			if not scxml_initial.is_empty():
+				parsed_root_states[0].initial_id = scxml_initial
 			_instantiate_state_tree(
 				parsed_root_states[0], root_node, state_by_id, pending_transitions
 			)
@@ -246,6 +248,19 @@ func _parse_state_element(xml: XMLParser, element_name: String) -> ParsedState:
 				var node_name := xml.get_node_name()
 				if node_name == "state" or node_name == "parallel" or node_name == "history":
 					parsed.children.append(_parse_state_element(xml, node_name))
+				elif node_name == "initial":
+					# Parse initial element's transition
+					if not xml.is_empty():
+						while xml.read() == OK:
+							match xml.get_node_type():
+								XMLParser.NODE_ELEMENT:
+									if xml.get_node_name() == "transition":
+										parsed.initial_id = _parse_transition_target(
+											xml.get_named_attribute_value_safe("target")
+										)
+								XMLParser.NODE_ELEMENT_END:
+									if xml.get_node_name() == "initial":
+										break
 				elif node_name == "transition":
 					var trans_meta := {}
 					for i in range(xml.get_attribute_count()):
@@ -491,6 +506,12 @@ func _instantiate_state_tree(
 	for key in parsed.metadata:
 		state_node.set_meta(key, parsed.metadata[key])
 
+	if state_node is CompoundState:
+		# Set a dummy initial state to prevent automatic assignment of the last child
+		# during import in the editor. CompoundState has a deferred call to set
+		# initial_state if it's empty when a child is added.
+		state_node.initial_state = ^"."
+
 	if state_node is HistoryStateScript:
 		var h_state := state_node as HistoryState
 		var type_meta = parsed.metadata.get(_sanitize_meta_key("attr:type"), "shallow")
@@ -525,7 +546,7 @@ func _instantiate_state_tree(
 		)
 
 	if state_node is CompoundState:
-		_assign_initial_state(state_node as CompoundState, parsed)
+		_assign_initial_state(state_node as CompoundState, parsed, state_by_id)
 
 	return state_node
 
@@ -544,7 +565,11 @@ func _create_state_node(parsed: ParsedState) -> StateChartState:
 	return state_node
 
 
-func _assign_initial_state(state_node: CompoundState, parsed: ParsedState) -> void:
+func _assign_initial_state(
+	state_node: CompoundState,
+	parsed: ParsedState,
+	state_by_id: Dictionary[StringName, StateChartState]
+) -> void:
 	var child_states: Array[StateChartState] = []
 	for child in state_node.get_children():
 		if child is StateChartState:
@@ -555,14 +580,39 @@ func _assign_initial_state(state_node: CompoundState, parsed: ParsedState) -> vo
 
 	var initial_target: StateChartState = null
 	if not parsed.initial_id.is_empty():
+		# Try direct child first
 		for child_state in child_states:
 			if child_state.name == String(parsed.initial_id):
 				initial_target = child_state
 				break
+
+		# If not a direct child, try finding it in the descendants
+		if initial_target == null and parsed.initial_id in state_by_id:
+			var target := state_by_id[parsed.initial_id]
+			# Ensure it is actually a descendant of state_node
+			var current := target
+			var path_to_target: Array[StateChartState] = []
+			while current != null and current != state_node:
+				path_to_target.append(current)
+				current = current.get_parent() as StateChartState
+
+			if current == state_node:
+				# It is a descendant. Trace back to set all intermediate initial states
+				# The last element in path_to_target is the direct child of state_node
+				initial_target = path_to_target[-1]
+
+				# Set intermediate initial states
+				var prev := state_node as StateChartState
+				for i in range(path_to_target.size() - 1, 0, -1):
+					var parent := path_to_target[i]
+					if parent is CompoundState:
+						var child := path_to_target[i - 1]
+						(parent as CompoundState).initial_state = parent.get_path_to(child)
+
 		if initial_target == null:
 			push_warning(
 				(
-					"Initial state '%s' was not found under '%s'. Falling back to the first child."
+					"Initial state '%s' was not found as a descendant of '%s'. Falling back to the first child."
 					% [parsed.initial_id, parsed.id]
 				)
 			)
