@@ -244,7 +244,8 @@ static var _entries_cache: Dictionary = {}
 		exclude_warn_unknown_events = value
 		update_configuration_warnings()
 
-@export_tool_button("Check errors", "Callable") var check_errors_btn := check_errors
+@export_tool_button("Check errors", "Callable") var check_errors_btn := func() -> void: check_errors()
+@export_tool_button("Clear all metadata", "Callable") var clear_metadata_btn := func() -> void: clear_all_metadata()
 
 # ------------- [Private Variable] -------------
 ## Whether at least one state has been entered
@@ -728,6 +729,12 @@ func _update_all_warnings(node: Node) -> void:
 		_update_all_warnings(child)
 
 
+func _collect_nodes_recursive(node: Node, list: Array[Node]) -> void:
+	list.append(node)
+	for child in node.get_children():
+		_collect_nodes_recursive(child, list)
+
+
 # ------------- [Public Method] -------------
 ## Re-establishes internal signal connections for the entire state machine.
 ## Useful after importing SCXML or manually modifying the node tree.
@@ -753,6 +760,55 @@ func check_errors() -> void:
 	_entries_cache.clear()
 	_update_all_warnings(self)
 	notify_property_list_changed()
+
+
+## Clears all metadata from this node and all of its descendants.
+## Supports undo/redo if called within the Godot editor.
+func clear_all_metadata() -> void:
+	var nodes: Array[Node] = []
+	_collect_nodes_recursive(self, nodes)
+
+	var cleared_count := 0
+	if Engine.is_editor_hint():
+		var ei: Object = Engine.get_singleton("EditorInterface")
+		if ei:
+			var ur: Object = ei.get_editor_undo_redo()
+			if ur:
+				ur.create_action("Clear All StateChartExt Metadata")
+				for node in nodes:
+					for meta_key in node.get_meta_list():
+						var val = node.get_meta(meta_key)
+						ur.add_do_method(node, "remove_meta", meta_key)
+						ur.add_undo_method(node, "set_meta", meta_key, val)
+						cleared_count += 1
+				ur.commit_action()
+
+				if cleared_count > 0:
+					DLogger.info(
+						"Cleared {0} metadata entries across {1} nodes.",
+						[cleared_count, nodes.size()],
+						CAT,
+						self
+					)
+				else:
+					DLogger.info("No metadata entries found to clear.", [], CAT, self)
+				return
+
+	# Fallback for runtime execution or when editor undo/redo is not available
+	for node in nodes:
+		for meta_key in node.get_meta_list():
+			node.remove_meta(meta_key)
+			cleared_count += 1
+
+	if cleared_count > 0:
+		DLogger.info(
+			"Cleared {0} metadata entries across {1} nodes.",
+			[cleared_count, nodes.size()],
+			CAT,
+			self
+		)
+	else:
+		DLogger.info("No metadata entries found to clear.", [], CAT, self)
 
 
 ## Function to use instead of set_expression_property when setting parameters.
