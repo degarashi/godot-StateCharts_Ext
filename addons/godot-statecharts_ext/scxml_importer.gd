@@ -100,6 +100,10 @@ func import_scxml(path: String, root_node: Node) -> Error:
 	if parse_err != OK:
 		return parse_err
 
+	var is_in_tree := root_node.is_inside_tree()
+	if is_in_tree:
+		root_node.set_block_signals(true)
+
 	var saved_connections := _save_connections(root_node)
 
 	if root_node is StateChartExt:
@@ -136,24 +140,29 @@ func import_scxml(path: String, root_node: Node) -> Error:
 
 	root_node.initial_expression_properties = initial_properties
 
-	if parsed_root_states.is_empty():
-		return OK
+	if not parsed_root_states.is_empty():
+		var state_by_id: Dictionary[StringName, StateChartState] = {}
+		var pending_transitions: Array[PendingTransition] = []
 
-	var state_by_id: Dictionary[StringName, StateChartState] = {}
-	var pending_transitions: Array[PendingTransition] = []
+		if parsed_root_states.size() == 1:
+			_instantiate_state_tree(
+				parsed_root_states[0], root_node, state_by_id, pending_transitions
+			)
+		else:
+			var synthetic_root := ParsedState.new(scxml_name, &"state", scxml_initial)
+			synthetic_root.children = parsed_root_states
+			_instantiate_state_tree(synthetic_root, root_node, state_by_id, pending_transitions)
 
-	if parsed_root_states.size() == 1:
-		_instantiate_state_tree(parsed_root_states[0], root_node, state_by_id, pending_transitions)
-	else:
-		var synthetic_root := ParsedState.new(scxml_name, &"state", scxml_initial)
-		synthetic_root.children = parsed_root_states
-		_instantiate_state_tree(synthetic_root, root_node, state_by_id, pending_transitions)
-
-	_resolve_pending_transitions(pending_transitions, state_by_id)
-	_restore_connections(root_node, saved_connections)
+		_resolve_pending_transitions(pending_transitions, state_by_id)
+		_restore_connections(root_node, saved_connections)
 
 	if root_node is StateChartExt:
 		root_node.connect_internal_signals()
+
+	if is_in_tree:
+		root_node.set_block_signals(false)
+		if root_node.has_signal("child_order_changed"):
+			root_node.emit_signal("child_order_changed")
 
 	return OK
 
@@ -162,7 +171,7 @@ func _clear_existing_statechart_nodes(root_node: Node) -> void:
 	for child in root_node.get_children():
 		if child is StateChartState or child is Transition:
 			root_node.remove_child(child)
-			child.queue_free()
+			child.free()
 
 
 func _parse_datamodel(xml: XMLParser, properties: Dictionary) -> void:
