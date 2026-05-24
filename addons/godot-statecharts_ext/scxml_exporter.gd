@@ -351,37 +351,6 @@ func _is_same_group(a: Dictionary, b: Dictionary) -> bool:
 	return true
 
 
-func _export_guard_attrs(node: Transition) -> Array[String]:
-	var attrs: Array[String] = []
-	if node.guard == null:
-		return attrs
-
-	var cond := _guard_to_cond(node.guard, node)
-	if not cond.is_empty():
-		attrs.append('cond="%s"' % _escape_attr(cond))
-
-	var guard_ast := _guard_to_ast(node.guard, node)
-	if guard_ast.is_empty():
-		push_warning(
-			(
-				"Unsupported guard type '%s' for transition '%s'. Guard was not exported."
-				% [
-					(
-						node.guard.get_script().resource_path
-						if node.guard.get_script()
-						else node.guard.get_class()
-					),
-					node.name
-				]
-			)
-		)
-		return attrs
-
-	var json := JSON.stringify(guard_ast, "")
-	attrs.append('%s="%s"' % [GUARD_JSON_ATTR_NAME, _escape_attr(json)])
-	return attrs
-
-
 func _guard_to_cond(guard: Guard, context_transition: Transition) -> String:
 	if guard == null:
 		return ""
