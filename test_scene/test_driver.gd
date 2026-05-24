@@ -6,6 +6,7 @@ const CAT := "test"
 
 
 func _ready() -> void:
+	DLogger.info("Test Driver Started", [], CAT, self)
 	if Engine.is_editor_hint():
 		return
 
@@ -13,6 +14,8 @@ func _ready() -> void:
 	await get_tree().process_frame
 
 	DLogger.info("--- Starting StateChartExt Comprehensive Test ---", [], CAT, self)
+	sc.e.respawn.call()
+	await get_tree().process_frame
 
 	# Check initial state
 	DLogger.info("Initial health: {0}", [sc.p.health], CAT, self)
@@ -71,3 +74,11 @@ func _ready() -> void:
 
 	DLogger.info("--- Comprehensive Test Finished ---", [], CAT, self)
 	get_tree().quit()
+
+
+func _on_state_entered(msg: String) -> void:
+	DLogger.info("State Entered: {0}", [msg], CAT, self)
+
+
+func _on_state_exited(msg: String) -> void:
+	DLogger.info("State Exited: {0}", [msg], CAT, self)

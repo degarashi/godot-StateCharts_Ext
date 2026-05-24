@@ -51,90 +51,98 @@ script = ExtResource("1_driver")
 unique_name_in_owner = true
 script = ExtResource("2_player_sc")
 
-[node name="Root" type="Node" parent="Player" unique_id=499059036]
+[node name="Root" type="Node" parent="Player" unique_id=1887174497]
 script = ExtResource("3_compound")
-initial_state = NodePath("Dead")
+initial_state = NodePath("Alive")
 
-[node name="Alive" type="Node" parent="Player/Root" unique_id=792938011]
+[node name="Dead" type="Node" parent="Player/Root" unique_id=727377688]
+script = ExtResource("4_atomic")
+
+[node name="Respawn" type="Node" parent="Player/Root/Dead" unique_id=1310457155]
+script = ExtResource("6_transition")
+to = NodePath("../../Alive")
+event = &"respawn"
+delay_in_seconds = "0.0"
+
+[node name="Alive" type="Node" parent="Player/Root" unique_id=561059908]
 script = ExtResource("3_compound")
-initial_state = NodePath("Stunned")
+initial_state = NodePath("Normal")
 
-[node name="Normal" type="Node" parent="Player/Root/Alive" unique_id=1381681530]
+[node name="Stunned" type="Node" parent="Player/Root/Alive" unique_id=1927007615]
+script = ExtResource("4_atomic")
+
+[node name="Recover" type="Node" parent="Player/Root/Alive/Stunned" unique_id=227007115]
+script = ExtResource("6_transition")
+to = NodePath("../../Normal")
+event = &"stun_end"
+delay_in_seconds = "0.0"
+
+[node name="Normal" type="Node" parent="Player/Root/Alive" unique_id=113519264]
 script = ExtResource("5_parallel")
 
-[node name="Movement" type="Node" parent="Player/Root/Alive/Normal" unique_id=641718614]
+[node name="Movement" type="Node" parent="Player/Root/Alive/Normal" unique_id=1874332190]
 script = ExtResource("3_compound")
 initial_state = NodePath("Airborne")
 
-[node name="OnGround" type="Node" parent="Player/Root/Alive/Normal/Movement" unique_id=129490292]
+[node name="OnGround" type="Node" parent="Player/Root/Alive/Normal/Movement" unique_id=900933338]
 script = ExtResource("4_atomic")
 
-[node name="Jump" type="Node" parent="Player/Root/Alive/Normal/Movement/OnGround" unique_id=1708673686]
+[node name="Jump" type="Node" parent="Player/Root/Alive/Normal/Movement/OnGround" unique_id=35494574]
 script = ExtResource("6_transition")
 to = NodePath("../../Airborne")
 event = &"jump"
 delay_in_seconds = "0.0"
 
-[node name="Airborne" type="Node" parent="Player/Root/Alive/Normal/Movement" unique_id=378349033]
+[node name="Airborne" type="Node" parent="Player/Root/Alive/Normal/Movement" unique_id=1206686715]
 script = ExtResource("4_atomic")
 
-[node name="Land" type="Node" parent="Player/Root/Alive/Normal/Movement/Airborne" unique_id=1995132288]
+[node name="Land" type="Node" parent="Player/Root/Alive/Normal/Movement/Airborne" unique_id=1518715648]
 script = ExtResource("6_transition")
 to = NodePath("../../OnGround")
 event = &"land"
 delay_in_seconds = "0.0"
 
-[node name="Weapon" type="Node" parent="Player/Root/Alive/Normal" unique_id=141966180]
+[node name="Weapon" type="Node" parent="Player/Root/Alive/Normal" unique_id=184704332]
 script = ExtResource("3_compound")
 initial_state = NodePath("Reloading")
 
-[node name="Ready" type="Node" parent="Player/Root/Alive/Normal/Weapon" unique_id=155097079]
+[node name="Ready" type="Node" parent="Player/Root/Alive/Normal/Weapon" unique_id=1121308518]
 script = ExtResource("4_atomic")
 
-[node name="Attack" type="Node" parent="Player/Root/Alive/Normal/Weapon/Ready" unique_id=1607306268]
+[node name="Attack" type="Node" parent="Player/Root/Alive/Normal/Weapon/Ready" unique_id=755797777]
 script = ExtResource("6_transition")
 to = NodePath("../../Reloading")
 event = &"attack"
 guard = SubResource("Resource_hj51b")
 delay_in_seconds = "0.0"
 
-[node name="Reloading" type="Node" parent="Player/Root/Alive/Normal/Weapon" unique_id=901396156]
+[node name="Reloading" type="Node" parent="Player/Root/Alive/Normal/Weapon" unique_id=1358108601]
 script = ExtResource("4_atomic")
 
-[node name="ReloadDone" type="Node" parent="Player/Root/Alive/Normal/Weapon/Reloading" unique_id=915069677]
+[node name="ReloadDone" type="Node" parent="Player/Root/Alive/Normal/Weapon/Reloading" unique_id=1882294380]
 script = ExtResource("6_transition")
 to = NodePath("../../Ready")
 event = &"reload_done"
 delay_in_seconds = "1.0"
 
-[node name="Stunned" type="Node" parent="Player/Root/Alive" unique_id=2036008690]
-script = ExtResource("4_atomic")
-
-[node name="Recover" type="Node" parent="Player/Root/Alive/Stunned" unique_id=262732101]
-script = ExtResource("6_transition")
-to = NodePath("../../Normal")
-event = &"stun_end"
-delay_in_seconds = "0.0"
-
-[node name="StunTrigger" type="Node" parent="Player/Root/Alive" unique_id=765167853]
+[node name="StunTrigger" type="Node" parent="Player/Root/Alive" unique_id=588945468]
 script = ExtResource("6_transition")
 to = NodePath("../Stunned")
 event = &"stun"
 guard = SubResource("Resource_tejsh")
 delay_in_seconds = "0.0"
 
-[node name="DieTrigger" type="Node" parent="Player/Root/Alive" unique_id=302323961]
+[node name="DieTrigger" type="Node" parent="Player/Root/Alive" unique_id=308602092]
 script = ExtResource("6_transition")
 to = NodePath("../../Dead")
 event = &"die"
 guard = SubResource("Resource_i8f6p")
 delay_in_seconds = "0.0"
 
-[node name="Dead" type="Node" parent="Player/Root" unique_id=2137786512]
-script = ExtResource("4_atomic")
-
-[node name="Respawn" type="Node" parent="Player/Root/Dead" unique_id=428146291]
-script = ExtResource("6_transition")
-to = NodePath("../../Alive")
-event = &"respawn"
-delay_in_seconds = "0.0"
+[connection signal="state_entered" from="Player/Root/Dead" to="." method="_on_state_entered" binds= ["Dead"]]
+[connection signal="state_exited" from="Player/Root/Dead" to="." method="_on_state_exited" binds= ["Dead"]]
+[connection signal="state_entered" from="Player/Root/Alive" to="." method="_on_state_entered" binds= ["Alive"]]
+[connection signal="state_exited" from="Player/Root/Alive" to="." method="_on_state_exited" binds= ["Alive"]]
+[connection signal="state_entered" from="Player/Root/Alive/Normal/Movement/OnGround" to="." method="_on_state_entered" binds= ["OnGround"]]
+[connection signal="state_entered" from="Player/Root/Alive/Normal/Movement/Airborne" to="." method="_on_state_entered" binds= ["Airborne"]]
+[connection signal="state_entered" from="Player/Root/Alive/Normal/Weapon/Ready" to="." method="_on_state_entered" binds= ["WeaponReady"]]
