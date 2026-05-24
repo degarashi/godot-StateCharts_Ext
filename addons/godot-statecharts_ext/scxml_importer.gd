@@ -98,6 +98,7 @@ func import_scxml(path: String, root_node: Node) -> Error:
 	if parse_err != OK:
 		return parse_err
 
+	var saved_connections := _save_connections(root_node)
 	_clear_existing_statechart_nodes(root_node)
 
 	var scxml_initial := StringName()
@@ -143,6 +144,7 @@ func import_scxml(path: String, root_node: Node) -> Error:
 		_instantiate_state_tree(synthetic_root, root_node, state_by_id, pending_transitions)
 
 	_resolve_pending_transitions(pending_transitions, state_by_id)
+	_restore_connections(root_node, saved_connections)
 	return OK
 
 
@@ -627,3 +629,49 @@ func _guards_from_ast_array(
 			if guard != null:
 				guards.append(guard)
 	return guards
+
+
+func _save_connections(root_node: Node) -> Array:
+	var saved: Array = []
+	for child in root_node.get_children():
+		if child is StateChartState or child is Transition:
+			_collect_connections_recursive(child, root_node, saved)
+	return saved
+
+
+func _collect_connections_recursive(node: Node, root_node: Node, saved: Array) -> void:
+	var rel_path := root_node.get_path_to(node)
+	for sig_info in node.get_signal_list():
+		var sig_name: String = sig_info["name"]
+		var sig := Signal(node, sig_name)
+		for conn in sig.get_connections():
+			saved.append(
+				{
+					"source_path": rel_path,
+					"signal_name": sig_name,
+					"callable": conn["callable"],
+					"flags": conn["flags"]
+				}
+			)
+
+	for child in node.get_children():
+		_collect_connections_recursive(child, root_node, saved)
+
+
+func _restore_connections(root_node: Node, saved: Array) -> void:
+	for data in saved:
+		var source := root_node.get_node_or_null(data["source_path"])
+		if not source:
+			continue
+
+		if not source.has_signal(data["signal_name"]):
+			continue
+
+		var sig := Signal(source, data["signal_name"])
+		var callable: Callable = data["callable"]
+
+		if not callable.is_valid():
+			continue
+
+		if not sig.is_connected(callable):
+			sig.connect(callable, data["flags"])

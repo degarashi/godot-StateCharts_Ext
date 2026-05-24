@@ -223,6 +223,8 @@ static func parse_and_generate(
 	var error_msg := ""
 	var pending_comments: Array[String] = []
 
+	var used_names: Dictionary[String, int] = {}
+
 	for i in range(lines.size()):
 		var raw_line := lines[i].strip_edges()
 
@@ -254,6 +256,15 @@ static func parse_and_generate(
 		var final_comment := "\n\t## ".join(pending_comments)
 		pending_comments.clear()
 
+		if cmd != "class":
+			if used_names.has(name):
+				error_msg = (
+					"Line %d: Duplicate name '%s' (previously defined at line %d)."
+					% [i + 1, name, used_names[name]]
+				)
+				break
+			used_names[name] = i + 1
+
 		if cmd == "class":
 			class_name_str = name
 		elif cmd == "event":
@@ -265,39 +276,54 @@ static func parse_and_generate(
 			var p_notify: Dictionary[String, bool] = {}
 			var p_local_state := ""
 
-			# 1. Extract brace options
-			var brace_start := line_content.find("{")
+			# Robustly extract brace options from the end of the line.
+			# Rule: The last { ... } block is options IF it's not preceded by an '='.
 			var line_without_brace := line_content
-			if brace_start != -1:
-				var brace_end := line_content.rfind("}")
-				if brace_end != -1:
-					var brace_content := line_content.substr(
-						brace_start + 1, brace_end - brace_start - 1
-					)
-					line_without_brace = line_content.substr(0, brace_start).strip_edges()
+			var brace_content := ""
 
-					var pairs := brace_content.split(",", false)
-					for pair in pairs:
-						var kv := pair.split(":", false)
-						if kv.size() == 2:
-							var k := kv[0].strip_edges()
-							var v_str := kv[1].strip_edges()
-							if k == "local":
-								p_local_state = (
-									v_str
-									. strip_edges()
-									. trim_prefix('"')
-									. trim_suffix('"')
-									. trim_prefix("'")
-									. trim_suffix("'")
-								)
-							else:
-								p_notify[k] = v_str.to_lower() == "true"
-						else:
-							error_msg = "Line %d: Invalid notification/option map syntax." % (i + 1)
+			if line_content.ends_with("}"):
+				var depth := 0
+				var brace_start := -1
+				for j in range(line_content.length() - 1, -1, -1):
+					var c := line_content[j]
+					if c == "}":
+						depth += 1
+					elif c == "{":
+						depth -= 1
+						if depth == 0:
+							brace_start = j
 							break
-				else:
-					error_msg = "Line %d: Missing closing brace '}'." % (i + 1)
+
+				if brace_start != -1:
+					# Check if this brace block is preceded by '='
+					var prefix := line_content.substr(0, brace_start).strip_edges()
+					if not prefix.ends_with("="):
+						brace_content = line_content.substr(
+							brace_start + 1, line_content.length() - brace_start - 2
+						)
+						line_without_brace = prefix
+
+			if not brace_content.is_empty():
+				var pairs := brace_content.split(",", false)
+				for pair in pairs:
+					var kv := pair.split(":", false)
+					if kv.size() == 2:
+						var k := kv[0].strip_edges()
+						var v_str := kv[1].strip_edges()
+						if k == "local":
+							p_local_state = (
+								v_str
+								. strip_edges()
+								. trim_prefix('"')
+								. trim_suffix('"')
+								. trim_prefix("'")
+								. trim_suffix("'")
+							)
+						else:
+							p_notify[k] = v_str.to_lower() == "true"
+					else:
+						error_msg = "Line %d: Invalid notification/option map syntax." % (i + 1)
+						break
 
 			if not error_msg.is_empty():
 				break
