@@ -729,6 +729,23 @@ func _update_all_warnings(node: Node) -> void:
 
 
 # ------------- [Public Method] -------------
+## Re-establishes internal signal connections for the entire state machine.
+## Useful after importing SCXML or manually modifying the node tree.
+func connect_internal_signals() -> void:
+	_connect_state_signals_early(self)
+	_connect_state_signals_late(self)
+	_update_debug_log_connections(self)
+	_update_debug_event_connection()
+
+
+## Resets the internal state of the state chart.
+## Useful before re-importing SCXML or when completely restarting the state machine.
+func reset_internal_state() -> void:
+	_any_state_entered = false
+	_context_state_stack.clear()
+	_state_local_params.clear()
+
+
 ## Manually check for configuration warnings.
 func check_errors() -> void:
 	if Engine.is_editor_hint():

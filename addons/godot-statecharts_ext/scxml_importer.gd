@@ -99,6 +99,10 @@ func import_scxml(path: String, root_node: Node) -> Error:
 		return parse_err
 
 	var saved_connections := _save_connections(root_node)
+
+	if root_node is StateChartExt:
+		root_node.reset_internal_state()
+
 	_clear_existing_statechart_nodes(root_node)
 
 	var scxml_initial := StringName()
@@ -145,6 +149,10 @@ func import_scxml(path: String, root_node: Node) -> Error:
 
 	_resolve_pending_transitions(pending_transitions, state_by_id)
 	_restore_connections(root_node, saved_connections)
+
+	if root_node is StateChartExt:
+		root_node.connect_internal_signals()
+
 	return OK
 
 
@@ -641,15 +649,30 @@ func _save_connections(root_node: Node) -> Array:
 
 func _collect_connections_recursive(node: Node, root_node: Node, saved: Array) -> void:
 	var rel_path := root_node.get_path_to(node)
+	var internal_methods := [
+		"_on_state_entered_context",
+		"_on_state_exited_cleanup",
+		"_on_state_entered",
+		"_on_state_exited",
+		"_on_event_received"
+	]
+
 	for sig_info in node.get_signal_list():
 		var sig_name: String = sig_info["name"]
 		var sig := Signal(node, sig_name)
 		for conn in sig.get_connections():
+			var callable: Callable = conn["callable"]
+
+			# Skip internal connections of StateChartExt
+			if callable.get_object() == root_node:
+				if callable.get_method() in internal_methods:
+					continue
+
 			saved.append(
 				{
 					"source_path": rel_path,
 					"signal_name": sig_name,
-					"callable": conn["callable"],
+					"callable": callable,
 					"flags": conn["flags"]
 				}
 			)
