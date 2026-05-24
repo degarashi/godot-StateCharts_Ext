@@ -378,7 +378,19 @@ func _on_state_entered_context(state: StateChartState) -> void:
 		var params := _init_and_get_entries(sc_info.param, ParamEnt)
 		for p_name in params:
 			var ent := params[p_name] as ParamEnt
+			var is_match := false
 			if ent.local_state == state.name:
+				is_match = true
+			elif not ent.local_state.is_empty():
+				# Check relative path from this node to the state
+				var rel_path := str(get_path_to(state))
+				if (
+					rel_path == str(ent.local_state)
+					or rel_path.ends_with("/" + str(ent.local_state))
+				):
+					is_match = true
+
+			if is_match:
 				var init_val: Variant = ent.initial_value
 				if init_val is NoneValue:
 					init_val = _make_zero(ent.type_id)
