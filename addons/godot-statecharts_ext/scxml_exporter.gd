@@ -26,6 +26,7 @@ const UID_META_KEY := "statechart_ext__uid"
 
 var _node_to_id: Dictionary[Node, String] = {}
 var _node_to_uid: Dictionary[Node, String] = {}
+var _state_to_local_params: Dictionary[String, Array] = {}
 
 
 ## Exports the state chart to an SCXML string
@@ -33,6 +34,19 @@ func export_to_scxml(node: Node) -> String:
 	_node_to_id.clear()
 	_node_to_uid.clear()
 	_assign_unique_ids(node)
+	_state_to_local_params.clear()
+	if node is StateChartExt:
+		var sc_info = node.get_sc_info()
+		if sc_info != null:
+			var params = node._init_and_get_entries(sc_info.param, node.ParamEnt)
+			for p_name in params:
+				var ent = params[p_name] as StateChartExt.ParamEnt
+				if not ent.local_state.is_empty():
+					var state_name = String(ent.local_state).get_file()
+					if not _state_to_local_params.has(state_name):
+						_state_to_local_params[state_name] = []
+					_state_to_local_params[state_name].append(ent)
+
 	_ensure_and_collect_uids(node)
 
 	var xml_lines: Array[String] = []
@@ -150,22 +164,63 @@ func _collect_used_prefixes(node: Node, dst: Dictionary[String, bool]) -> void:
 
 
 func _export_datamodel(node: StateChartExt, lines: Array[String], indent: int) -> void:
-	if node.initial_expression_properties.is_empty():
+	var global_params: Dictionary[String, Variant] = {}
+
+	# Collect global parameters generated from .scdef
+	var sc_info = node.get_sc_info()
+	if sc_info != null:
+		var params = node._init_and_get_entries(sc_info.param, node.ParamEnt)
+		for p_name in params:
+			var ent = params[p_name] as StateChartExt.ParamEnt
+			if ent.local_state.is_empty():
+				var val = ent.initial_value
+				if val is StateChartExt.NoneValue:
+					global_params[p_name] = null
+				else:
+					global_params[p_name] = val
+
+	# Merge dynamically added initial properties
+	for key in node.initial_expression_properties:
+		global_params[String(key)] = node.initial_expression_properties[key]
+
+	if global_params.is_empty():
 		return
 
 	var spacing := "\t".repeat(indent)
 	lines.append("{s}<datamodel>".format({"s": spacing}))
-	for key in node.initial_expression_properties:
-		var val: Variant = node.initial_expression_properties[key]
+	for key in global_params:
+		var val = global_params[key]
 		var val_str := ""
-		if val is String or val is StringName:
+		if val == null:
+			val_str = "null"
+		elif val is String or val is StringName:
 			val_str = "'%s'" % _escape_attr(String(val))
 		else:
 			val_str = _escape_attr(str(val))
 
 		lines.append(
 			'{s}\t<data id="{id}" expr="{expr}"/>'.format(
-				{"s": spacing, "id": _escape_attr(String(key)), "expr": val_str}
+				{"s": spacing, "id": _escape_attr(key), "expr": val_str}
+			)
+		)
+	lines.append("{s}</datamodel>".format({"s": spacing}))
+
+
+func _export_local_datamodel(params: Array, lines: Array[String], indent: int) -> void:
+	var spacing := "\t".repeat(indent)
+	lines.append("{s}<datamodel>".format({"s": spacing}))
+	for ent in params:
+		var val = ent.initial_value
+		var val_str := ""
+		if val is StateChartExt.NoneValue:
+			val_str = "null"
+		elif val is String or val is StringName:
+			val_str = "'%s'" % _escape_attr(String(val))
+		else:
+			val_str = _escape_attr(str(val))
+		lines.append(
+			'{s}\t<data id="{id}" expr="{expr}"/>'.format(
+				{"s": spacing, "id": _escape_attr(String(ent.name)), "expr": val_str}
 			)
 		)
 	lines.append("{s}</datamodel>".format({"s": spacing}))
@@ -178,7 +233,8 @@ func _export_state(node: Node, lines: Array[String], indent: int) -> void:
 	if node is StateChartState:
 		var tag_name := _state_tag_name(node)
 		var state_attrs: Array[String] = []
-		state_attrs.append('id="%s"' % _escape_attr(_node_to_id.get(node, node.name)))
+		var state_id := _node_to_id.get(node, node.name)
+		state_attrs.append('id="%s"' % _escape_attr(state_id))
 
 		# Initial state for compound states
 		if node is CompoundState:
@@ -237,6 +293,9 @@ func _export_state(node: Node, lines: Array[String], indent: int) -> void:
 				{"s": spacing, "tag": tag_name, "attrs": " ".join(state_attrs)}
 			)
 		)
+
+		if _state_to_local_params.has(state_id):
+			_export_local_datamodel(_state_to_local_params[state_id], lines, indent + 1)
 
 		for t in extra_tags:
 			lines.append(t)

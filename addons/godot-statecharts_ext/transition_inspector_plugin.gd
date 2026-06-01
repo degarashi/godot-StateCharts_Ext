@@ -11,9 +11,9 @@ func _can_handle(object: Object) -> bool:
 		if path.ends_with("transition.gd") and "godot_state_charts" in path:
 			return true
 
-	# グローバルクラス名として登録されていない場合を考慮し、文字列でもチェック
+	# Consider cases where it is not registered as a global class name
 	if object.is_class("Transition") or object.get_class() == "Transition":
-		print("[ScExt_Inspect] -> MATCH via class type!")
+		DLogger.debug("MATCH via class type!", [], "state_chart", self)
 		return true
 	return false
 

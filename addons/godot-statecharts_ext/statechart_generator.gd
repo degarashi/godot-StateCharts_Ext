@@ -212,10 +212,8 @@ static func _generate_script(class_name_str: String, events: Array, params: Arra
 
 
 # ------------- [Public Method] -------------
-## Parses scdef text and returns a Dictionary with "code" (String) and "error" (String, empty if OK).
-static func parse_and_generate(
-	text: String, fallback_name: String = "GeneratedStateChart"
-) -> Dictionary:
+## Parses scdef text and returns a Dictionary with "events", "params", "class_name", and "error".
+static func parse_scdef(text: String, fallback_name: String = "GeneratedStateChart") -> Dictionary:
 	var lines := text.split("\n")
 	var class_name_str := fallback_name
 	var events: Array[Dictionary] = []
@@ -359,6 +357,61 @@ static func parse_and_generate(
 			break
 
 	if not error_msg.is_empty():
-		return {"code": "", "error": error_msg}
+		return {"error": error_msg}
 
-	return {"code": _generate_script(class_name_str, events, params), "error": ""}
+	return {"class_name": class_name_str, "events": events, "params": params, "error": ""}
+
+
+## Parses scdef text and returns a Dictionary with "code" (String) and "error" (String, empty if OK).
+static func parse_and_generate(
+	text: String, fallback_name: String = "GeneratedStateChart"
+) -> Dictionary:
+	var result := parse_scdef(text, fallback_name)
+	if not result.error.is_empty():
+		return {"code": "", "error": result.error}
+
+	return {"code": _generate_script(result.class_name, result.events, result.params), "error": ""}
+
+
+## Generates API documentation in Markdown format
+static func generate_markdown_doc(class_name_str: String, events: Array, params: Array) -> String:
+	var lines: Array[String] = []
+	lines.append("# API Reference: %s" % class_name_str)
+	lines.append("")
+
+	# --- Events ---
+	lines.append("## Events")
+	if events.is_empty():
+		lines.append("No events defined.")
+	else:
+		lines.append("| Name | Description |")
+		lines.append("| :--- | :--- |")
+		for ev in events:
+			lines.append("| `%s` | %s |" % [ev.name, ev.comment.replace("\n", " ").strip_edges()])
+	lines.append("")
+
+	# --- Parameters ---
+	lines.append("## Parameters")
+	if params.is_empty():
+		lines.append("No parameters defined.")
+	else:
+		lines.append("| Name | Type | Initial | Local State | Description |")
+		lines.append("| :--- | :--- | :--- | :--- | :--- |")
+		for p_data in params:
+			var init: String = p_data.init if not p_data.init.is_empty() else "-"
+			var local: String = p_data.local_state if not p_data.local_state.is_empty() else "-"
+			lines.append(
+				(
+					"| `%s` | %s | %s | %s | %s |"
+					% [
+						p_data.name,
+						p_data.type,
+						init,
+						local,
+						p_data.comment.replace("\n", " ").strip_edges()
+					]
+				)
+			)
+	lines.append("")
+
+	return "\n".join(lines)

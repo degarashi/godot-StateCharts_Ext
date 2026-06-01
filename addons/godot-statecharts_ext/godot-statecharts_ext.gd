@@ -6,11 +6,15 @@ extends EditorPlugin
 
 # ------------- [Constants] -------------
 const CAT = "ScExt_Gen"
+const MENU_FORCE_REGENERATE := "StateChartExt: Force Regenerate all .scdef"
+const MENU_EXPORT_SCXML := "StateChartExt: Export current StateChart as SCXML"
+const MENU_IMPORT_SCXML := "StateChartExt: Import SCXML to current StateChart"
+const MENU_CONVERT_SCXML := "StateChartExt: Convert SCXML to .scdef"
 
 # ------------- [Private Variables] -------------
 var _fs_reloading := false
-var _import_plugin: RefCounted
-var _scxml_import_plugin: RefCounted
+var _import_plugin: EditorImportPlugin
+var _scxml_import_plugin: EditorImportPlugin
 var _transition_inspector_plugin: EditorInspectorPlugin
 var _statechart_ext_inspector_plugin: EditorInspectorPlugin
 
@@ -19,10 +23,13 @@ var _statechart_ext_inspector_plugin: EditorInspectorPlugin
 func _enter_tree() -> void:
 	DLogger.info("Plugin enabled.", [], CAT)
 
-	_import_plugin = preload("scdef_import_plugin.gd").new()
+	var DummyImportPlugin := preload("dummy_import_plugin.gd")
+	_import_plugin = DummyImportPlugin.new(
+		"statechart_ext.scdef", "StateChart Definition", ["scdef"]
+	)
 	add_import_plugin(_import_plugin)
 
-	_scxml_import_plugin = preload("scxml_import_plugin.gd").new()
+	_scxml_import_plugin = DummyImportPlugin.new("statechart_ext.scxml", "SCXML File", ["scxml"])
 	add_import_plugin(_scxml_import_plugin)
 
 	# Wait for the editor to be fully ready before registration
@@ -33,9 +40,10 @@ func _enter_tree() -> void:
 	if fs.has_signal("sources_changed"):
 		fs.sources_changed.connect(_on_sources_changed)
 
-	add_tool_menu_item("StateChartExt: Force Regenerate all .scdef", _manual_scan)
-	add_tool_menu_item("StateChartExt: Export current StateChart as SCXML", _manual_export_scxml)
-	add_tool_menu_item("StateChartExt: Import SCXML to current StateChart", _manual_import_scxml)
+	add_tool_menu_item(MENU_FORCE_REGENERATE, _manual_scan)
+	add_tool_menu_item(MENU_EXPORT_SCXML, _manual_export_scxml)
+	add_tool_menu_item(MENU_IMPORT_SCXML, _manual_import_scxml)
+	add_tool_menu_item(MENU_CONVERT_SCXML, _manual_convert_scxml_to_scdef)
 
 	# Wait for the filesystem to be fully loaded before initial scan
 	var timer := get_tree().create_timer(1.0)
@@ -59,9 +67,10 @@ func _exit_tree() -> void:
 		remove_inspector_plugin(_statechart_ext_inspector_plugin)
 		_statechart_ext_inspector_plugin = null
 
-	remove_tool_menu_item("StateChartExt: Force Regenerate all .scdef")
-	remove_tool_menu_item("StateChartExt: Export current StateChart as SCXML")
-	remove_tool_menu_item("StateChartExt: Import SCXML to current StateChart")
+	remove_tool_menu_item(MENU_FORCE_REGENERATE)
+	remove_tool_menu_item(MENU_EXPORT_SCXML)
+	remove_tool_menu_item(MENU_IMPORT_SCXML)
+	remove_tool_menu_item(MENU_CONVERT_SCXML)
 
 	var fs := EditorInterface.get_resource_filesystem()
 	if fs.filesystem_changed.is_connected(_on_filesystem_changed):
@@ -144,15 +153,62 @@ func _manual_import_scxml() -> void:
 	_scxml_import_dialog.popup_centered_ratio(0.5)
 
 
+func _manual_convert_scxml_to_scdef() -> void:
+	if not _scxml_import_dialog:
+		_scxml_import_dialog = EditorFileDialog.new()
+		_scxml_import_dialog.file_mode = EditorFileDialog.FILE_MODE_OPEN_FILE
+		_scxml_import_dialog.add_filter("*.scxml", "SCXML files")
+		_scxml_import_dialog.file_selected.connect(_on_scxml_convert_file_selected)
+		EditorInterface.get_base_control().add_child(_scxml_import_dialog)
+
+	_scxml_import_dialog.popup_centered_ratio(0.5)
+
+
+func _on_scxml_convert_file_selected(path: String) -> void:
+	var scdef_path := path.get_basename() + ".scdef"
+	var scdef_content := StateChartScxmlImporter.generate_scdef(path)
+
+	if not scdef_content.is_empty():
+		var f := FileAccess.open(scdef_path, FileAccess.WRITE)
+		if f:
+			f.store_string(scdef_content)
+			f.close()
+			DLogger.info("Generated .scdef: {0}", [scdef_path], CAT)
+			EditorInterface.get_resource_filesystem().update_file(scdef_path)
+			_process_scdef_file(scdef_path)
+		else:
+			DLogger.error("Failed to write .scdef: {0}", [scdef_path], CAT)
+	else:
+		DLogger.error("Failed to generate .scdef from: {0}", [path], CAT)
+
+
 func _on_scxml_import_file_selected(path: String) -> void:
 	var selected_nodes := EditorInterface.get_selection().get_selected_nodes()
 	if selected_nodes.is_empty() or not selected_nodes[0] is StateChartExt:
 		return
 
+	# Auto-generate and save .scdef from SCXML
+	var scdef_path := path.get_basename() + ".scdef"
+	var scdef_content := StateChartScxmlImporter.generate_scdef(path)
+	if not scdef_content.is_empty():
+		var f_scdef := FileAccess.open(scdef_path, FileAccess.WRITE)
+		if f_scdef:
+			f_scdef.store_string(scdef_content)
+			f_scdef.close()
+			DLogger.info("Auto-generated .scdef: {0}", [scdef_path], CAT)
+			EditorInterface.get_resource_filesystem().update_file(scdef_path)
+			_process_scdef_file(scdef_path)  # Generate .gd immediately
+
 	var importer := StateChartScxmlImporter.new()
 	var err := importer.import_scxml(path, selected_nodes[0])
 	if err == OK:
 		DLogger.info("SCXML imported successfully: {0}", [path], CAT)
+		# Automatically attach generated GDScript to node
+		var gd_path := scdef_path.get_basename() + ".gd"
+		var script := load(gd_path) as Script
+		if script:
+			selected_nodes[0].set_script(script)
+			DLogger.info("Attached generated script: {0}", [gd_path], CAT)
 	else:
 		DLogger.error("Failed to import SCXML: {0}", [err], CAT)
 

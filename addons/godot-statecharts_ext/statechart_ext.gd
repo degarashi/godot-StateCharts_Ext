@@ -244,8 +244,10 @@ static var _entries_cache: Dictionary = {}
 		exclude_warn_unknown_events = value
 		update_configuration_warnings()
 
-@export_tool_button("Check errors", "Callable") var check_errors_btn := func() -> void: check_errors()
-@export_tool_button("Clear all metadata", "Callable") var clear_metadata_btn := func() -> void: clear_all_metadata()
+@export_tool_button("Check errors", "Callable")
+var check_errors_btn := func() -> void: check_errors()
+@export_tool_button("Clear all metadata", "Callable")
+var clear_metadata_btn := func() -> void: clear_all_metadata()
 
 # ------------- [Private Variable] -------------
 ## Whether at least one state has been entered
@@ -282,11 +284,19 @@ func _get_property_list() -> Array[Dictionary]:
 
 	for p_name in params:
 		var ent := params[p_name] as ParamEnt
-		properties.append(
-			{"name": "p/" + p_name, "type": ent.type_id, "usage": PROPERTY_USAGE_EDITOR}
-		)
+		var usage := PROPERTY_USAGE_DEFAULT
+		if ent.type_id == TYPE_NIL:
+			usage |= PROPERTY_USAGE_NIL_IS_VARIANT
+		properties.append({"name": "p/" + p_name, "type": ent.type_id, "usage": usage})
 
 	return properties
+
+
+func _validate_property(property: Dictionary) -> void:
+	if property.name == "initial_expression_properties":
+		# Hide the base dictionary from the inspector since we have the p/ properties.
+		# We keep STORAGE so it's still saved and the base class can use it.
+		property.usage = PROPERTY_USAGE_STORAGE
 
 
 func _get(property: StringName) -> Variant:
@@ -301,7 +311,25 @@ func _get(property: StringName) -> Variant:
 		if sc_info != null:
 			var params := _init_and_get_entries(sc_info.param, ParamEnt)
 			if p_name in params:
-				return get_expression_property_ext(params[p_name] as ParamEnt)
+				var ent := params[p_name] as ParamEnt
+				var val = get_expression_property_ext(ent)
+				if val == null:
+					if not ent.initial_value is NoneValue:
+						return ent.initial_value
+					return _make_zero(ent.type_id)
+				return val
+	else:
+		var sc_info := get_sc_info()
+		if sc_info != null:
+			var params := _init_and_get_entries(sc_info.param, ParamEnt)
+			if property in params:
+				var ent := params[property] as ParamEnt
+				var val = get_expression_property_ext(ent)
+				if val == null:
+					if not ent.initial_value is NoneValue:
+						return ent.initial_value
+					return _make_zero(ent.type_id)
+				return val
 	return null
 
 
@@ -319,7 +347,33 @@ func _set(property: StringName, value: Variant) -> bool:
 		if sc_info != null:
 			var params := _init_and_get_entries(sc_info.param, ParamEnt)
 			if p_name in params:
-				set_expression_property_ext(params[p_name] as ParamEnt, value)
+				var ent := params[p_name] as ParamEnt
+				if Engine.is_editor_hint():
+					if (
+						not initial_expression_properties.has(ent.name)
+						or initial_expression_properties[ent.name] != value
+					):
+						initial_expression_properties[ent.name] = value
+						# Ensure the dictionary is marked as changed
+						initial_expression_properties = initial_expression_properties
+						notify_property_list_changed()
+				set_expression_property_ext(ent, value)
+				return true
+	else:
+		var sc_info := get_sc_info()
+		if sc_info != null:
+			var params := _init_and_get_entries(sc_info.param, ParamEnt)
+			if property in params:
+				var ent := params[property] as ParamEnt
+				if Engine.is_editor_hint():
+					if (
+						not initial_expression_properties.has(ent.name)
+						or initial_expression_properties[ent.name] != value
+					):
+						initial_expression_properties[ent.name] = value
+						initial_expression_properties = initial_expression_properties
+						notify_property_list_changed()
+				set_expression_property_ext(ent, value)
 				return true
 	return false
 
@@ -343,7 +397,9 @@ func _ready() -> void:
 		for p_name in params:
 			var ent := params[p_name] as ParamEnt
 			if ent.local_state.is_empty() and not ent.initial_value is NoneValue:
-				set_expression_property_ext(ent, ent.initial_value, true)
+				# Only apply the initial value if it's not already set via inspector
+				if not initial_expression_properties.has(ent.name):
+					set_expression_property_ext(ent, ent.initial_value, true)
 
 		if get(&"e") == null:
 			set(&"e", DynamicEventProxy.new(self, sc_info.event))
@@ -513,6 +569,8 @@ static func gather_params_id(source: Script) -> Dictionary[String, int]:
 static func _check_parameter_type(
 	param_name: String, expect_type_id: int, actual_value: Variant, context: Object
 ) -> void:
+	if expect_type_id == TYPE_NIL:
+		return
 	var typeid := typeof(actual_value)
 	if typeid != expect_type_id:
 		DLogger.error(
@@ -668,23 +726,23 @@ func _check_param_internal(
 func _check_expression(
 	dst: PackedStringArray, path: String, exp_str: String, param_def: Dictionary[String, int]
 ) -> void:
-	var params: Array[StringName] = []
+	var params: PackedStringArray = []
 	for k in param_def.keys():
 		params.append(k)
 
 	var expr := Expression.new()
 	if expr.parse(exp_str, params) != OK:
 		dst.append("Expression parse error: {1}\n at [{0}]".format([path, expr.get_error_text()]))
+		return
 
-	var dummy_arg: Array[Variant] = []
-	for param_name in params:
-		dummy_arg.append(_make_zero(param_def.get(param_name)))
-	expr.execute(dummy_arg)
+	var inputs: Array = []
+	for k in param_def.keys():
+		inputs.append(_make_zero(param_def[k]))
+
+	expr.execute(inputs, self)
 	if expr.has_execute_failed():
 		dst.append(
-			'Expression execution failed:\n"{1}"\n{2}\n at [{0}]'.format(
-				[path, exp_str, expr.get_error_text()]
-			)
+			"Expression execution error: {1}\n at [{0}]".format([path, expr.get_error_text()])
 		)
 
 

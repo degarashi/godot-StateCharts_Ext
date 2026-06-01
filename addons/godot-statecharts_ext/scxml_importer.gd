@@ -85,14 +85,144 @@ func _set_owner(node: Node, owner_node: Node) -> void:
 		node.owner = owner_node
 
 
+# ------------- [Public Method] -------------
+## Generates .scdef text from an SCXML file
+static func generate_scdef(path: String) -> String:
+	var file := FileAccess.open(path, FileAccess.READ)
+	if not file:
+		return ""
+
+	var xml := XMLParser.new()
+	if xml.open_buffer(file.get_buffer(file.get_length())) != OK:
+		return ""
+
+	var class_name_str := path.get_file().get_basename().to_pascal_case() + "SC"
+	var events: Dictionary[String, bool] = {}
+	var params: Array[Dictionary] = []
+	var state_stack: Array[String] = []
+
+	while xml.read() == OK:
+		var node_type := xml.get_node_type()
+		if node_type == XMLParser.NODE_ELEMENT:
+			var node_name := xml.get_node_name()
+			if node_name == "state" or node_name == "parallel":
+				var state_id := xml.get_named_attribute_value_safe("id")
+				if state_id.is_empty():
+					state_id = xml.get_named_attribute_value_safe("name")
+				state_stack.append(state_id)
+			elif node_name == "scxml":
+				var scxml_name := xml.get_named_attribute_value_safe("name")
+				if not scxml_name.is_empty():
+					class_name_str = scxml_name.to_pascal_case() + "SC"
+			elif node_name == "data":
+				var id := xml.get_named_attribute_value_safe("id")
+				var expr := xml.get_named_attribute_value_safe("expr").strip_edges()
+				if not id.is_empty():
+					var type_str := "variant"
+					var val_str := expr
+					if (
+						(expr.begins_with("'") and expr.ends_with("'"))
+						or (expr.begins_with('"') and expr.ends_with('"'))
+					):
+						type_str = "string"
+						val_str = expr
+					elif expr.to_lower() == "true" or expr.to_lower() == "false":
+						type_str = "bool"
+					elif expr.is_valid_int():
+						type_str = "int"
+					elif expr.is_valid_float():
+						type_str = "float"
+					else:
+						# Default to string for unquoted identifiers/literals to avoid compile errors
+						type_str = "string"
+						val_str = '"%s"' % expr.replace('"', '\\"')
+					var local_state := ""
+					if not state_stack.is_empty():
+						local_state = state_stack.back()
+
+					params.append(
+						{"name": id, "type": type_str, "expr": val_str, "local": local_state}
+					)
+			elif node_name == "transition":
+				var event_attr := xml.get_named_attribute_value_safe("event")
+				for ev in event_attr.split(" ", false):
+					var ev_name := ev
+					if ev.contains("@"):
+						ev_name = ev.split("@")[0]
+					if not ev_name.is_empty():
+						events[ev_name] = true
+
+				var cond_attr := xml.get_named_attribute_value_safe("cond")
+				if not cond_attr.is_empty():
+					_extract_params_from_cond(cond_attr, params)
+		elif node_type == XMLParser.NODE_ELEMENT_END:
+			var node_name := xml.get_node_name()
+			if node_name == "state" or node_name == "parallel":
+				if not state_stack.is_empty():
+					state_stack.pop_back()
+
+	var lines: Array[String] = []
+	lines.append("class %s" % class_name_str)
+	lines.append("")
+	for ev in events:
+		lines.append("event %s" % ev)
+	if not events.is_empty():
+		lines.append("")
+	for p in params:
+		var opt_str := ""
+		if not p["local"].is_empty():
+			opt_str = ' {local: "%s"}' % p["local"]
+		if p["expr"].is_empty() or p["expr"] == "null":
+			lines.append("param %s %s%s" % [p["name"], p["type"], opt_str])
+		else:
+			lines.append("param %s %s = %s%s" % [p["name"], p["type"], p["expr"], opt_str])
+
+	return "\n".join(lines)
+
+
+static func _extract_params_from_cond(cond: String, params: Array[Dictionary]) -> void:
+	# Remove strings to avoid picking up identifiers inside them
+	var string_regex := RegEx.new()
+	string_regex.compile("(['\"])(?:(?=(\\\\?))\\2.)*?\\1")
+	var stripped_cond := string_regex.sub(cond, " ", true)
+
+	var regex := RegEx.new()
+	regex.compile("\\b[a-zA-Z_][a-zA-Z0-9_]*\\b")
+	var matches := regex.search_all(stripped_cond)
+
+	var known_params: Dictionary[String, bool] = {}
+	for p in params:
+		known_params[p.name] = true
+
+	var reserved := ["true", "false", "null", "In", "not", "and", "or"]
+
+	for m in matches:
+		var name := m.get_string()
+		if name in reserved:
+			continue
+		if name in known_params:
+			continue
+
+		# Check if it's a function call (next char is '(' in the stripped cond)
+		var end_pos := m.get_end()
+		if end_pos < stripped_cond.length() and stripped_cond[end_pos] == "(":
+			continue
+
+		# Add as variant parameter (global)
+		params.append({"name": name, "type": "variant", "expr": "null", "local": ""})
+		known_params[name] = true
+
+
 ## Imports an SCXML file into the given root node
 func import_scxml(path: String, root_node: Node) -> Error:
+	DLogger.info("Starting SCXML import from: {0}", [path], "scxml_importer")
 	if not root_node is StateChartExt:
 		push_error("Import target must be a StateChartExt")
 		return ERR_INVALID_PARAMETER
 
 	var file := FileAccess.open(path, FileAccess.READ)
 	if not file:
+		DLogger.error("Failed to open SCXML file: {0}", [path], "scxml_importer")
 		return ERR_CANT_OPEN
 
 	var xml := XMLParser.new()
@@ -136,16 +266,17 @@ func import_scxml(path: String, root_node: Node) -> Error:
 		elif node_name == "datamodel":
 			_parse_datamodel(xml, initial_properties)
 		elif node_name == "state" or node_name == "parallel" or node_name == "history":
-			parsed_root_states.append(_parse_state_element(xml, node_name))
+			parsed_root_states.append(_parse_state_element(xml, node_name, initial_properties))
 
 	root_node.initial_expression_properties = initial_properties
+	DLogger.debug("Parsed {0} root states, {1} initial properties", [parsed_root_states.size(), initial_properties.size()], "scxml_importer")
 
 	if not parsed_root_states.is_empty():
 		var state_by_id: Dictionary[StringName, StateChartState] = {}
 		var pending_transitions: Array[PendingTransition] = []
 
 		if parsed_root_states.size() == 1:
-			if not scxml_initial.is_empty():
+			if not scxml_initial.is_empty() and parsed_root_states[0].id != scxml_initial:
 				parsed_root_states[0].initial_id = scxml_initial
 			_instantiate_state_tree(
 				parsed_root_states[0], root_node, state_by_id, pending_transitions
@@ -156,6 +287,7 @@ func import_scxml(path: String, root_node: Node) -> Error:
 			_instantiate_state_tree(synthetic_root, root_node, state_by_id, pending_transitions)
 
 		_resolve_pending_transitions(pending_transitions, state_by_id)
+		DLogger.debug("Resolved {0} pending transitions", [pending_transitions.size()], "scxml_importer")
 		_restore_connections(root_node, saved_connections)
 
 	if root_node is StateChartExt:
@@ -166,6 +298,7 @@ func import_scxml(path: String, root_node: Node) -> Error:
 		if root_node.has_signal("child_order_changed"):
 			root_node.emit_signal("child_order_changed")
 
+	DLogger.info("SCXML import completed successfully: {0}", [path], "scxml_importer")
 	return OK
 
 
@@ -218,7 +351,7 @@ func _parse_value(expr: String) -> Variant:
 	return expr
 
 
-func _parse_state_element(xml: XMLParser, element_name: String) -> ParsedState:
+func _parse_state_element(xml: XMLParser, element_name: String, initial_properties: Dictionary) -> ParsedState:
 	var state_id := xml.get_named_attribute_value_safe("id")
 	if state_id.is_empty():
 		state_id = xml.get_named_attribute_value_safe("name")
@@ -247,7 +380,9 @@ func _parse_state_element(xml: XMLParser, element_name: String) -> ParsedState:
 			XMLParser.NODE_ELEMENT:
 				var node_name := xml.get_node_name()
 				if node_name == "state" or node_name == "parallel" or node_name == "history":
-					parsed.children.append(_parse_state_element(xml, node_name))
+					parsed.children.append(_parse_state_element(xml, node_name, initial_properties))
+				elif node_name == "datamodel":
+					_parse_datamodel(xml, initial_properties)
 				elif node_name == "initial":
 					# Parse initial element's transition
 					if not xml.is_empty():
@@ -372,13 +507,26 @@ func _generate_transition_name(event: String, target: String) -> String:
 	return "Transition"
 
 
+func _skip_element(xml: XMLParser, element_name: String) -> void:
+	if xml.is_empty():
+		return
+	while xml.read() == OK:
+		match xml.get_node_type():
+			XMLParser.NODE_ELEMENT_END:
+				if xml.get_node_name() == element_name:
+					return
+
+
 func _parse_transition_target(target_attr: String) -> StringName:
 	var target_ids := target_attr.split(" ", false)
 	if target_ids.is_empty():
 		return &""
 	if target_ids.size() > 1:
-		push_warning(
-			"Multiple SCXML transition targets are not supported yet. Using the first target."
+		DLogger.warn(
+			"Multiple SCXML transition targets are not supported yet. Using the first target.",
+			[],
+			"scxml_importer",
+			self
 		)
 	return StringName(target_ids[0])
 
@@ -389,7 +537,12 @@ func _parse_transition_guard_ast(xml: XMLParser) -> Dictionary:
 		var parsed_json := JSON.parse_string(guard_json)
 		if parsed_json is Dictionary:
 			return parsed_json
-		push_warning("Invalid SCXML guard JSON encountered. Ignoring custom guard data.")
+		DLogger.warn(
+			"Invalid SCXML guard JSON encountered. Ignoring custom guard data.",
+			[],
+			"scxml_importer",
+			self
+		)
 
 	var cond := xml.get_named_attribute_value_safe("cond")
 	if not cond.is_empty():
@@ -617,7 +770,7 @@ func _assign_initial_state(
 				)
 			)
 
-	if initial_target == null:
+	if initial_target == null or initial_target == state_node:
 		initial_target = child_states[0]
 
 	state_node.initial_state = state_node.get_path_to(initial_target)
