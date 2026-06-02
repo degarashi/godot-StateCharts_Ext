@@ -3,6 +3,7 @@
 class_name StateChartScxmlExporter
 extends RefCounted
 
+# ------------- [Constants] -------------
 const EXT_NAMESPACE_PREFIX := "statechart_ext"
 const EXT_NAMESPACE_URI := "https://github.com/degarashi/godot-statecharts_ext/scxml"
 const NAME_ATTR_NAME := "%s:name" % EXT_NAMESPACE_PREFIX
@@ -24,84 +25,14 @@ const HistoryStateScript := preload("res://addons/godot_state_charts/history_sta
 const UID_ATTR_NAME := "%s:uid" % EXT_NAMESPACE_PREFIX
 const UID_META_KEY := "statechart_ext__uid"
 
+
+# ------------- [Private Variable] -------------
 var _node_to_id: Dictionary[Node, String] = {}
 var _node_to_uid: Dictionary[Node, String] = {}
 var _state_to_local_params: Dictionary[String, Array] = {}
 
 
-## Exports the state chart to an SCXML string
-func export_to_scxml(node: Node) -> String:
-	_node_to_id.clear()
-	_node_to_uid.clear()
-	_assign_unique_ids(node)
-	_state_to_local_params.clear()
-	if node is StateChartExt:
-		var sc_info = node.get_sc_info()
-		if sc_info != null:
-			var params = node._init_and_get_entries(sc_info.param, node.ParamEnt)
-			for p_name in params:
-				var ent = params[p_name] as StateChartExt.ParamEnt
-				if not ent.local_state.is_empty():
-					var state_name = String(ent.local_state).get_file()
-					if not _state_to_local_params.has(state_name):
-						_state_to_local_params[state_name] = []
-					_state_to_local_params[state_name].append(ent)
-
-	_ensure_and_collect_uids(node)
-
-	var xml_lines: Array[String] = []
-	xml_lines.append('<?xml version="1.0" encoding="UTF-8"?>')
-
-	var namespaces: Dictionary[String, String] = {
-		"xmlns": "http://www.w3.org/2005/07/scxml",
-		"xmlns:" + EXT_NAMESPACE_PREFIX: EXT_NAMESPACE_URI
-	}
-
-	# Scan for all used prefixes in the tree to ensure they are declared
-	var used_prefixes: Dictionary[String, bool] = {}
-	_collect_used_prefixes(node, used_prefixes)
-	if used_prefixes.has(QT_NAMESPACE_PREFIX):
-		namespaces["xmlns:" + QT_NAMESPACE_PREFIX] = QT_NAMESPACE_URI
-
-	# Detect extra namespaces from metadata
-	var root_attrs: Array[String] = []
-	for meta_key in node.get_meta_list():
-		if meta_key.contains("__"):
-			var desanitized_key := _desanitize_meta_key(meta_key)
-			var parts := desanitized_key.split(":")
-
-			# If it's a namespace declaration, add to namespaces dict to avoid duplicates
-			if parts.size() == 2 and parts[0] == "xmlns":
-				namespaces[desanitized_key] = str(node.get_meta(meta_key))
-				continue
-
-			if parts.size() == 2:
-				root_attrs.append(
-					'%s="%s"' % [desanitized_key, _escape_attr(str(node.get_meta(meta_key)))]
-				)
-
-	var ns_parts: Array[String] = []
-	# Sort keys for deterministic output
-	var ns_keys := namespaces.keys()
-	ns_keys.sort()
-	for ns in ns_keys:
-		ns_parts.append('%s="%s"' % [ns, namespaces[ns]])
-
-	xml_lines.append(
-		'<scxml {ns} version="1.0" profile="ecmascript" {attrs}>'.format(
-			{"ns": " ".join(ns_parts), "attrs": " ".join(root_attrs)}
-		)
-	)
-
-	if node is StateChartExt:
-		_export_datamodel(node, xml_lines, 1)
-
-	_export_state(node, xml_lines, 1)
-
-	xml_lines.append("</scxml>")
-	return "\n".join(xml_lines)
-
-
+# ------------- [Private Method] -------------
 func _ensure_and_collect_uids(node: Node) -> void:
 	if node is StateChartState:
 		var uid: String = ""
@@ -511,13 +442,92 @@ func _guards_to_ast_array(guards: Array[Guard], context_transition: Transition) 
 
 
 func _escape_attr(value: String) -> String:
-	return value.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(
-		">", "&gt;"
+	return (
+		value
+		. replace("&", "&amp;")
+		. replace('"', "&quot;")
+		. replace("'", "&apos;")
+		. replace("<", "&lt;")
+		. replace(">", "&gt;")
 	)
 
 
 func _desanitize_meta_key(key: String) -> String:
 	return key.replace("__", ":")
+
+
+# ------------- [Public Method] -------------
+## Exports the state chart to an SCXML string
+func export_to_scxml(node: Node) -> String:
+	_node_to_id.clear()
+	_node_to_uid.clear()
+	_assign_unique_ids(node)
+	_state_to_local_params.clear()
+	if node is StateChartExt:
+		var sc_info = node.get_sc_info()
+		if sc_info != null:
+			var params = node._init_and_get_entries(sc_info.param, node.ParamEnt)
+			for p_name in params:
+				var ent = params[p_name] as StateChartExt.ParamEnt
+				if not ent.local_state.is_empty():
+					var state_name = String(ent.local_state).get_file()
+					if not _state_to_local_params.has(state_name):
+						_state_to_local_params[state_name] = []
+					_state_to_local_params[state_name].append(ent)
+
+	_ensure_and_collect_uids(node)
+
+	var xml_lines: Array[String] = []
+	xml_lines.append('<?xml version="1.0" encoding="UTF-8"?>')
+
+	var namespaces: Dictionary[String, String] = {
+		"xmlns": "http://www.w3.org/2005/07/scxml",
+		"xmlns:" + EXT_NAMESPACE_PREFIX: EXT_NAMESPACE_URI
+	}
+
+	# Scan for all used prefixes in the tree to ensure they are declared
+	var used_prefixes: Dictionary[String, bool] = {}
+	_collect_used_prefixes(node, used_prefixes)
+	if used_prefixes.has(QT_NAMESPACE_PREFIX):
+		namespaces["xmlns:" + QT_NAMESPACE_PREFIX] = QT_NAMESPACE_URI
+
+	# Detect extra namespaces from metadata
+	var root_attrs: Array[String] = []
+	for meta_key in node.get_meta_list():
+		if meta_key.contains("__"):
+			var desanitized_key := _desanitize_meta_key(meta_key)
+			var parts := desanitized_key.split(":")
+
+			# If it's a namespace declaration, add to namespaces dict to avoid duplicates
+			if parts.size() == 2 and parts[0] == "xmlns":
+				namespaces[desanitized_key] = str(node.get_meta(meta_key))
+				continue
+
+			if parts.size() == 2:
+				root_attrs.append(
+					'%s="%s"' % [desanitized_key, _escape_attr(str(node.get_meta(meta_key)))]
+				)
+
+	var ns_parts: Array[String] = []
+	# Sort keys for deterministic output
+	var ns_keys := namespaces.keys()
+	ns_keys.sort()
+	for ns in ns_keys:
+		ns_parts.append('%s="%s"' % [ns, namespaces[ns]])
+
+	xml_lines.append(
+		'<scxml {ns} version="1.0" profile="ecmascript" {attrs}>'.format(
+			{"ns": " ".join(ns_parts), "attrs": " ".join(root_attrs)}
+		)
+	)
+
+	if node is StateChartExt:
+		_export_datamodel(node, xml_lines, 1)
+
+	_export_state(node, xml_lines, 1)
+
+	xml_lines.append("</scxml>")
+	return "\n".join(xml_lines)
 
 
 ## Exports to file

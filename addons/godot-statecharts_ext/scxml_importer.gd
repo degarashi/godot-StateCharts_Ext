@@ -3,6 +3,7 @@
 class_name StateChartScxmlImporter
 extends RefCounted
 
+# ------------- [Constants] -------------
 const EXT_NAMESPACE_PREFIX := "statechart_ext"
 const NAME_ATTR_NAME := "%s:name" % EXT_NAMESPACE_PREFIX
 const GUARD_JSON_ATTR_NAME := "%s:guard_json" % EXT_NAMESPACE_PREFIX
@@ -17,7 +18,10 @@ const NotGuardScript := preload("res://addons/godot_state_charts/not_guard.gd")
 const AllOfGuardScript := preload("res://addons/godot_state_charts/all_of_guard.gd")
 const AnyOfGuardScript := preload("res://addons/godot_state_charts/any_of_guard.gd")
 
+const HistoryStateScript := preload("res://addons/godot_state_charts/history_state.gd")
 
+
+# ------------- [Defines] -------------
 class ParsedTransition:
 	var name: String
 	var event: StringName
@@ -62,9 +66,6 @@ class ParsedState:
 		metadata = metadata_a
 
 
-const HistoryStateScript := preload("res://addons/godot_state_charts/history_state.gd")
-
-
 class PendingTransition:
 	var node: Node  # Can be Transition or HistoryState
 	var target_id: StringName
@@ -80,6 +81,7 @@ class PendingTransition:
 		is_history_default = is_hist
 
 
+# ------------- [Private Method] -------------
 func _set_owner(node: Node, owner_node: Node) -> void:
 	if owner_node:
 		node.owner = owner_node
@@ -556,7 +558,7 @@ func _cond_to_ast(cond: String) -> Dictionary:
 		return {}
 
 	# Handle top-level AND
-	var parts_and := _split_top_level(cond, " && ")
+	var parts_and := _split_top_level(cond, "&&")
 	if parts_and.size() > 1:
 		var guards: Array = []
 		for p in parts_and:
@@ -566,7 +568,7 @@ func _cond_to_ast(cond: String) -> Dictionary:
 		return {"type": "all_of", "guards": guards}
 
 	# Handle top-level OR
-	var parts_or := _split_top_level(cond, " || ")
+	var parts_or := _split_top_level(cond, "||")
 	if parts_or.size() > 1:
 		var guards: Array = []
 		for p in parts_or:
@@ -575,18 +577,20 @@ func _cond_to_ast(cond: String) -> Dictionary:
 				guards.append(ast)
 		return {"type": "any_of", "guards": guards}
 
-	# Handle NOT
-	if cond.begins_with("!") and cond.ends_with(")"):
-		var first_paren := cond.find("(")
-		if first_paren == 1:
-			var inner := cond.substr(first_paren + 1, cond.length() - first_paren - 2)
-			if _is_balanced(inner):
-				return {"type": "not", "guard": _cond_to_ast(inner)}
+	# Handle NOT (allow spaces: ! (...))
+	if cond.begins_with("!"):
+		var inner := cond.substr(1).strip_edges()
+		if inner.begins_with("(") and inner.ends_with(")"):
+			var content := inner.substr(1, inner.length() - 2)
+			if _is_balanced(content):
+				return {"type": "not", "guard": _cond_to_ast(content)}
 
-	# Handle In('...')
-	if cond.begins_with("In('") and cond.ends_with("')"):
-		var state_id := cond.substr(4, cond.length() - 6)
-		return {"type": "state_is_active", "state": state_id}
+	# Handle In('...') with RegEx for robustness (quotes and spaces)
+	var in_regex := RegEx.new()
+	in_regex.compile("^\\s*In\\s*\\(\\s*(['\"])(.*?)\\1\\s*\\)\\s*$")
+	var in_match := in_regex.search(cond)
+	if in_match:
+		return {"type": "state_is_active", "state": in_match.get_string(2)}
 
 	# Handle unwrapping parens (A) -> A
 	if cond.begins_with("(") and cond.ends_with(")"):
