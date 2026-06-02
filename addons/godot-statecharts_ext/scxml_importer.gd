@@ -277,13 +277,19 @@ func import_scxml(path: String, root_node: Node) -> Error:
 		var state_by_id: Dictionary[StringName, StateChartState] = {}
 		var pending_transitions: Array[PendingTransition] = []
 
+		var needs_synthetic_root := true
 		if parsed_root_states.size() == 1:
-			if not scxml_initial.is_empty() and parsed_root_states[0].id != scxml_initial:
-				parsed_root_states[0].initial_id = scxml_initial
-			_instantiate_state_tree(
-				parsed_root_states[0], root_node, state_by_id, pending_transitions
-			)
-		else:
+			var single_root := parsed_root_states[0]
+			# If there's only one root state and its name matches the scxml name,
+			# we don't need the synthetic wrapper.
+			if scxml_name == single_root.id:
+				needs_synthetic_root = false
+				# Transfer scxml-level initial state if the single root doesn't have its own
+				if not scxml_initial.is_empty() and single_root.initial_id.is_empty():
+					single_root.initial_id = scxml_initial
+				_instantiate_state_tree(single_root, root_node, state_by_id, pending_transitions)
+
+		if needs_synthetic_root:
 			var synthetic_root := ParsedState.new(scxml_name, &"state", scxml_initial)
 			synthetic_root.children = parsed_root_states
 			_instantiate_state_tree(synthetic_root, root_node, state_by_id, pending_transitions)
