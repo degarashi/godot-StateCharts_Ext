@@ -8,6 +8,9 @@ extends StateChart
 
 # ------------- [Constants] -------------
 const CAT := "state_chart"
+const LOCAL_PARAM_PREFIX := "[L: "
+const LOCAL_PARAM_SUFFIX := "] "
+const PATH_SEPARATOR := "/"
 
 
 # ------------- [Defines] -------------
@@ -289,7 +292,7 @@ func _get_property_list() -> Array[Dictionary]:
 			usage |= PROPERTY_USAGE_NIL_IS_VARIANT
 		var display_name := p_name
 		if not ent.local_state.is_empty():
-			display_name = "[L: %s] %s" % [ent.local_state, p_name]
+			display_name = "%s%s%s %s" % [LOCAL_PARAM_PREFIX, ent.local_state, LOCAL_PARAM_SUFFIX, p_name]
 
 		properties.append({"name": "p/" + display_name, "type": ent.type_id, "usage": usage})
 
@@ -311,10 +314,10 @@ func _get(property: StringName) -> Variant:
 
 	if property.begins_with("p/"):
 		var p_name := property.trim_prefix("p/")
-		if p_name.begins_with("[L: "):
-			var close_bracket := p_name.find("] ")
+		if p_name.begins_with(LOCAL_PARAM_PREFIX):
+			var close_bracket := p_name.find(LOCAL_PARAM_SUFFIX)
 			if close_bracket != -1:
-				p_name = p_name.substr(close_bracket + 2)
+				p_name = p_name.substr(close_bracket + LOCAL_PARAM_SUFFIX.length())
 		var sc_info := get_sc_info()
 		if sc_info != null:
 			var params := _init_and_get_entries(sc_info.param, ParamEnt)
@@ -351,10 +354,10 @@ func _set(property: StringName, value: Variant) -> bool:
 
 	if property.begins_with("p/"):
 		var p_name := property.trim_prefix("p/")
-		if p_name.begins_with("[L: "):
-			var close_bracket := p_name.find("] ")
+		if p_name.begins_with(LOCAL_PARAM_PREFIX):
+			var close_bracket := p_name.find(LOCAL_PARAM_SUFFIX)
 			if close_bracket != -1:
-				p_name = p_name.substr(close_bracket + 2)
+				p_name = p_name.substr(close_bracket + LOCAL_PARAM_SUFFIX.length())
 		var sc_info := get_sc_info()
 		if sc_info != null:
 			var params := _init_and_get_entries(sc_info.param, ParamEnt)
@@ -487,7 +490,7 @@ func _on_state_entered_context(state: StateChartState) -> void:
 				var rel_path := str(get_path_to(state))
 				if (
 					rel_path == str(ent.local_state)
-					or rel_path.ends_with("/" + str(ent.local_state))
+					or rel_path.ends_with(PATH_SEPARATOR + str(ent.local_state))
 				):
 					is_match = true
 
@@ -768,7 +771,7 @@ func _check_param_internal(
 	dst: PackedStringArray, node: Node, path: String, param_def: Dictionary[String, int]
 ) -> void:
 	for c in node.get_children():
-		var child_path := path + "/" + c.name
+		var child_path := path + PATH_SEPARATOR + c.name
 		if c is Transition:
 			var g_a := _find_expression_guard(dst, child_path, c.guard)
 			for g in g_a:
@@ -808,7 +811,7 @@ func _check_event_typo_internal(
 	err_msg: PackedStringArray, node: Node, path: String, events: Dictionary[String, EntBase]
 ) -> void:
 	for c in node.get_children():
-		var child_path := path + "/" + c.name
+		var child_path := path + PATH_SEPARATOR + c.name
 		if c is Transition:
 			if not c.event.is_empty() and c.event not in events:
 				err_msg.append("Unknown event: {1}\n at [{0}]".format([child_path, c.event]))
