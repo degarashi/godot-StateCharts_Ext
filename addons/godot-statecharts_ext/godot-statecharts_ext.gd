@@ -267,10 +267,10 @@ func _register_inspectors_delayed() -> void:
 		remove_inspector_plugin(_statechart_ext_inspector_plugin)
 		_statechart_ext_inspector_plugin = null
 
-	_transition_inspector_plugin = preload("transition_inspector_plugin.gd").new()
+	_transition_inspector_plugin = preload("uid://c2pho7wt7vtg4").new()
 	add_inspector_plugin(_transition_inspector_plugin)
 
-	_statechart_ext_inspector_plugin = preload("statechart_ext_inspector_plugin.gd").new(self)
+	_statechart_ext_inspector_plugin = preload("uid://b3tq0e06y60t3").new(self)
 	add_inspector_plugin(_statechart_ext_inspector_plugin)
 
 	DLogger.info("Inspector Plugins registered safely.", [], CAT)

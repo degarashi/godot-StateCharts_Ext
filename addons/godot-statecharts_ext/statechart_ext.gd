@@ -14,7 +14,6 @@ const PATH_SEPARATOR := "/"
 const SCDEF_EXTENSION := "scdef"
 const GD_EXTENSION := "gd"
 
-
 # ------------- [Defines] -------------
 ## Class to inherit user-defined parameters
 class Param:

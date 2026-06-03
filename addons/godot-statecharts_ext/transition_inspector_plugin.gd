@@ -28,7 +28,7 @@ func _parse_property(
 	_wide: bool
 ) -> bool:
 	if name == "event":
-		var ep := preload("transition_event_editor_property.gd").new()
+		var ep := preload("uid://c2btctwyvhbml").new()
 		add_property_editor(name, ep)
 		return true
 	return false

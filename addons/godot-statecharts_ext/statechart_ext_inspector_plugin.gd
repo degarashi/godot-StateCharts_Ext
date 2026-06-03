@@ -1,7 +1,7 @@
 @tool
 extends EditorInspectorPlugin
 
-const StateChartExtScript := preload("statechart_ext.gd")
+const StateChartExtScript := preload("uid://bjud7klva0cit")
 
 var _plugin: EditorPlugin
 var _doc_dialog: EditorFileDialog
