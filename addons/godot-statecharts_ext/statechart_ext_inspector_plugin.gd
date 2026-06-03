@@ -15,7 +15,7 @@ func _can_handle(object: Object) -> bool:
 	return object is StateChartExtScript
 
 
-func _parse_begin(object: Object) -> void:
+func _parse_begin(_object: Object) -> void:
 	var btn_export := Button.new()
 	btn_export.text = "Export to SCXML..."
 	btn_export.icon = _plugin.get_editor_interface().get_base_control().get_theme_icon(

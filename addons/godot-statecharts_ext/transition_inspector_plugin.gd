@@ -19,13 +19,13 @@ func _can_handle(object: Object) -> bool:
 
 
 func _parse_property(
-	object: Object,
-	type: int,
+	_object: Object,
+	_type: int,
 	name: String,
-	hint_type: int,
-	hint_string: String,
-	usage_flags: int,
-	wide: bool
+	_hint_type: int,
+	_hint_string: String,
+	_usage_flags: int,
+	_wide: bool
 ) -> bool:
 	if name == "event":
 		var ep := preload("transition_event_editor_property.gd").new()
