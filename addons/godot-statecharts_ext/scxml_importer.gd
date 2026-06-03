@@ -120,31 +120,7 @@ static func generate_scdef(path: String) -> String:
 				var id := xml.get_named_attribute_value_safe("id")
 				var expr := xml.get_named_attribute_value_safe("expr").strip_edges()
 				if not id.is_empty():
-					var type_str := "variant"
-					var val_str := expr
-					if (
-						(expr.begins_with("'") and expr.ends_with("'"))
-						or (expr.begins_with('"') and expr.ends_with('"'))
-					):
-						type_str = "string"
-						val_str = expr
-					elif expr.to_lower() == "true" or expr.to_lower() == "false":
-						type_str = "bool"
-					elif expr.is_valid_int():
-						type_str = "int"
-					elif expr.is_valid_float():
-						type_str = "float"
-					else:
-						# Default to string for unquoted identifiers/literals to avoid compile errors
-						type_str = "string"
-						val_str = '"%s"' % expr.replace('"', '\\"')
-					var local_state := ""
-					if not state_stack.is_empty():
-						local_state = state_stack.back()
-
-					params.append(
-						{"name": id, "type": type_str, "expr": val_str, "local": local_state}
-					)
+					_add_param_from_xml(id, expr, params, state_stack)
 			elif node_name == "transition":
 				var event_attr := xml.get_named_attribute_value_safe("event")
 				for ev in event_attr.split(" ", false):
@@ -158,7 +134,7 @@ static func generate_scdef(path: String) -> String:
 				if not cond_attr.is_empty():
 					_extract_params_from_cond(cond_attr, params)
 			elif node_name == "onentry" or node_name == "onexit":
-				_extract_events_from_executable_content(xml, node_name, events)
+				_extract_events_from_executable_content(xml, node_name, events, params, state_stack)
 		elif node_type == XMLParser.NODE_ELEMENT_END:
 			var node_name := xml.get_node_name()
 			if node_name == "state" or node_name == "parallel":
@@ -184,7 +160,41 @@ static func generate_scdef(path: String) -> String:
 	return "\n".join(lines)
 
 
-static func _extract_events_from_executable_content(xml: XMLParser, element_name: String, events: Dictionary[String, bool]) -> void:
+static func _add_param_from_xml(id: String, expr: String, params: Array[Dictionary], state_stack: Array[String]) -> void:
+	var type_str := "variant"
+	var val_str := expr
+	if (
+		(expr.begins_with("'") and expr.ends_with("'"))
+		or (expr.begins_with('"') and expr.ends_with('"'))
+	):
+		type_str = "string"
+		val_str = expr
+	elif expr.to_lower() == "true" or expr.to_lower() == "false":
+		type_str = "bool"
+	elif expr.is_valid_int():
+		type_str = "int"
+	elif expr.is_valid_float():
+		type_str = "float"
+	else:
+		# Default to string for unquoted identifiers/literals to avoid compile errors
+		type_str = "string"
+		val_str = '"%s"' % expr.replace('"', '\\"')
+	
+	var local_state := ""
+	if not state_stack.is_empty():
+		local_state = state_stack.back()
+
+	# Avoid duplicates in the same scope (or global)
+	for p in params:
+		if p.name == id and p.local == local_state:
+			return
+
+	params.append(
+		{"name": id, "type": type_str, "expr": val_str, "local": local_state}
+	)
+
+
+static func _extract_events_from_executable_content(xml: XMLParser, element_name: String, events: Dictionary[String, bool], params: Array[Dictionary], state_stack: Array[String]) -> void:
 	if xml.is_empty():
 		return
 	while xml.read() == OK:
@@ -195,6 +205,13 @@ static func _extract_events_from_executable_content(xml: XMLParser, element_name
 				var event := xml.get_named_attribute_value_safe("event")
 				if not event.is_empty():
 					events[event] = true
+			elif node_name == "param":
+				var id := xml.get_named_attribute_value_safe("name")
+				if id.is_empty():
+					id = xml.get_named_attribute_value_safe("id")
+				var expr := xml.get_named_attribute_value_safe("expr").strip_edges()
+				if not id.is_empty():
+					_add_param_from_xml(id, expr, params, state_stack)
 		elif node_type == XMLParser.NODE_ELEMENT_END:
 			if xml.get_node_name() == element_name:
 				return
