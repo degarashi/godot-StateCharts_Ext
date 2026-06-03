@@ -445,6 +445,24 @@ func _on_state_action(action: Dictionary) -> void:
 				_send_event_untyped(event)
 
 
+func _on_state_entered_actions(state: Node) -> void:
+	if state.has_meta("statechart_ext__onentry"):
+		var actions = state.get_meta("statechart_ext__onentry")
+		if actions is Array:
+			for action in actions:
+				if action is Dictionary:
+					_on_state_action(action)
+
+
+func _on_state_exited_actions(state: Node) -> void:
+	if state.has_meta("statechart_ext__onexit"):
+		var actions = state.get_meta("statechart_ext__onexit")
+		if actions is Array:
+			for action in actions:
+				if action is Dictionary:
+					_on_state_action(action)
+
+
 func _send_event_untyped(event: StringName) -> void:
 	# Internal helper to call the base class send_event and bypass the safety assert.
 	# This is used for SCXML-imported actions or internal logic.
@@ -646,13 +664,9 @@ func _connect_state_signals_early(node: Node) -> void:
 			if not _is_method_connected(child.state_entered, _on_state_entered_context):
 				child.state_entered.connect(_on_state_entered_context.bind(child))
 
-			# Connect onentry actions from metadata
-			if child.has_meta("statechart_ext__onentry"):
-				var actions = child.get_meta("statechart_ext__onentry")
-				if actions is Array:
-					for action in actions:
-						if not _is_action_connected(child.state_entered, action):
-							child.state_entered.connect(_on_state_action.bind(action))
+			# Connect onentry dispatcher
+			if not _is_method_connected(child.state_entered, _on_state_entered_actions):
+				child.state_entered.connect(_on_state_entered_actions.bind(child))
 
 		_connect_state_signals_early(child)
 
@@ -663,13 +677,9 @@ func _connect_state_signals_late(node: Node) -> void:
 			if not _is_method_connected(child.state_exited, _on_state_exited_cleanup):
 				child.state_exited.connect(_on_state_exited_cleanup.bind(child))
 
-			# Connect onexit actions from metadata
-			if child.has_meta("statechart_ext__onexit"):
-				var actions = child.get_meta("statechart_ext__onexit")
-				if actions is Array:
-					for action in actions:
-						if not _is_action_connected(child.state_exited, action):
-							child.state_exited.connect(_on_state_action.bind(action))
+			# Connect onexit dispatcher
+			if not _is_method_connected(child.state_exited, _on_state_exited_actions):
+				child.state_exited.connect(_on_state_exited_actions.bind(child))
 
 		_connect_state_signals_late(child)
 
@@ -678,19 +688,6 @@ func _is_method_connected(sig: Signal, method: Callable) -> bool:
 	for conn in sig.get_connections():
 		var c: Callable = conn["callable"]
 		if c.get_object() == self and c.get_method() == method.get_method():
-			return true
-	return false
-
-
-func _is_action_connected(sig: Signal, action: Dictionary) -> bool:
-	for conn in sig.get_connections():
-		var c: Callable = conn["callable"]
-		if (
-			c.get_object() == self
-			and c.get_method() == &"_on_state_action"
-			and c.get_bound_arguments().size() > 0
-			and str(c.get_bound_arguments()[0]) == str(action)
-		):
 			return true
 	return false
 
