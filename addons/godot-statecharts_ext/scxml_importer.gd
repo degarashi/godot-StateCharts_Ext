@@ -481,7 +481,7 @@ func _parse_state_element(xml: XMLParser, element_name: String, initial_properti
 						)
 
 				elif node_name == "onentry" or node_name == "onexit":
-					var actions := _parse_executable_content(xml, node_name)
+					var actions := _parse_executable_content(xml, node_name, params)
 					if not actions.is_empty():
 						parsed.metadata["statechart_ext__" + node_name] = actions
 
@@ -498,7 +498,7 @@ func _parse_state_element(xml: XMLParser, element_name: String, initial_properti
 	return parsed
 
 
-func _parse_executable_content(xml: XMLParser, element_name: String) -> Array[Dictionary]:
+func _parse_executable_content(xml: XMLParser, element_name: String, params: Array[Dictionary] = []) -> Array[Dictionary]:
 	var actions: Array[Dictionary] = []
 	if xml.is_empty():
 		return actions
@@ -511,6 +511,19 @@ func _parse_executable_content(xml: XMLParser, element_name: String) -> Array[Di
 					var event := xml.get_named_attribute_value_safe("event")
 					if not event.is_empty():
 						actions.append({"type": "send", "event": event})
+				elif node_name == "assign":
+					var location := xml.get_named_attribute_value_safe("location")
+					var expr := xml.get_named_attribute_value_safe("expr")
+					if not location.is_empty():
+						actions.append({"type": "assign", "location": location, "expr": expr})
+						# Add assigned location to known params if not exists
+						var found := false
+						for p in params:
+							if p.name == location:
+								found = true
+								break
+						if not found:
+							params.append({"name": location, "type": "variant", "expr": "null", "local": ""})
 				# Other elements could be added here later
 			XMLParser.NODE_ELEMENT_END:
 				if xml.get_node_name() == element_name:

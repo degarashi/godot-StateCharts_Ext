@@ -6,7 +6,8 @@ extends EditorPlugin
 
 # ------------- [Constants] -------------
 const CAT = "ScExt_Gen"
-const MENU_FORCE_REGENERATE := "StateChartExt: Force Regenerate all .scdef"
+const SCDEF_EXTENSION := "scdef"
+const MENU_FORCE_REGENERATE := "StateChartExt: Force Regenerate all ." + SCDEF_EXTENSION
 const MENU_EXPORT_SCXML := "StateChartExt: Export current StateChart as SCXML"
 const MENU_IMPORT_SCXML := "StateChartExt: Import SCXML to current StateChart"
 const MENU_CONVERT_SCXML := "StateChartExt: Convert SCXML to .scdef"
@@ -25,7 +26,7 @@ func _enter_tree() -> void:
 
 	var DummyImportPlugin := preload("dummy_import_plugin.gd")
 	_import_plugin = DummyImportPlugin.new(
-		"statechart_ext.scdef", "StateChart Definition", ["scdef"]
+		"statechart_ext." + SCDEF_EXTENSION, "StateChart Definition", [SCDEF_EXTENSION]
 	)
 	add_import_plugin(_import_plugin)
 
@@ -165,7 +166,7 @@ func _manual_convert_scxml_to_scdef() -> void:
 
 
 func _on_scxml_convert_file_selected(path: String) -> void:
-	var scdef_path := path.get_basename() + ".scdef"
+	var scdef_path := path.get_basename() + "." + SCDEF_EXTENSION
 	var scdef_content := StateChartScxmlImporter.generate_scdef(path)
 
 	if not scdef_content.is_empty():
@@ -188,7 +189,7 @@ func _on_scxml_import_file_selected(path: String) -> void:
 		return
 
 	# Auto-generate and save .scdef from SCXML
-	var scdef_path := path.get_basename() + ".scdef"
+	var scdef_path := path.get_basename() + "." + SCDEF_EXTENSION
 	var scdef_content := StateChartScxmlImporter.generate_scdef(path)
 	if not scdef_content.is_empty():
 		var f_scdef := FileAccess.open(scdef_path, FileAccess.WRITE)
@@ -290,7 +291,7 @@ func _scan_dir_recursive(path: String) -> void:
 			if not file_name.begins_with("."):
 				_scan_dir_recursive(path.path_join(file_name))
 		else:
-			if file_name.ends_with(".scdef"):
+			if file_name.ends_with("." + SCDEF_EXTENSION):
 				var full_path := path.path_join(file_name)
 				_process_scdef_file(full_path)
 

@@ -236,12 +236,23 @@ func _export_state(node: Node, lines: Array[String], indent: int) -> void:
 				if actions is Array:
 					lines.append("{s}\t<{tag}>".format({"s": spacing, "tag": action_type}))
 					for action in actions:
-						if action is Dictionary and action.get("type") == "send":
-							lines.append(
-								'{s}\t\t<send event="{ev}"/>'.format(
-									{"s": spacing, "ev": _escape_attr(action.get("event", ""))}
+						if action is Dictionary:
+							if action.get("type") == "send":
+								lines.append(
+									'{s}\t\t<send event="{ev}"/>'.format(
+										{"s": spacing, "ev": _escape_attr(action.get("event", ""))}
+									)
 								)
-							)
+							elif action.get("type") == "assign":
+								lines.append(
+									'{s}\t\t<assign location="{loc}" expr="{expr}"/>'.format(
+										{
+											"s": spacing,
+											"loc": _escape_attr(action.get("location", "")),
+											"expr": _escape_attr(action.get("expr", ""))
+										}
+									)
+								)
 					lines.append("{s}\t</{tag}>".format({"s": spacing, "tag": action_type}))
 
 		for t in extra_tags:
