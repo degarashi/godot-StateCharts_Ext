@@ -12,6 +12,7 @@ const LOCAL_PARAM_PREFIX := "[L: "
 const LOCAL_PARAM_SUFFIX := "] "
 const PATH_SEPARATOR := "/"
 const SCDEF_EXTENSION := "scdef"
+const GD_EXTENSION := "gd"
 
 
 # ------------- [Defines] -------------

@@ -208,7 +208,7 @@ func _on_scxml_import_file_selected(path: String) -> void:
 	if err == OK:
 		DLogger.info("SCXML imported successfully: {0}", [path], CAT)
 		# Automatically attach generated GDScript to node
-		var gd_path := scdef_path.get_basename() + ".gd"
+		var gd_path := scdef_path.get_basename() + "." + StateChartExt.GD_EXTENSION
 		var script := load(gd_path) as Script
 		if script:
 			selected_nodes[0].set_script(script)
@@ -218,7 +218,7 @@ func _on_scxml_import_file_selected(path: String) -> void:
 
 
 func _process_scdef_file(scdef_path: String) -> void:
-	var gd_path := scdef_path.get_basename() + ".gd"
+	var gd_path := scdef_path.get_basename() + "." + StateChartExt.GD_EXTENSION
 
 	var f_scdef := FileAccess.open(scdef_path, FileAccess.READ)
 	if not f_scdef:
