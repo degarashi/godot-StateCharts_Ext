@@ -275,28 +275,26 @@ func _get_property_list() -> Array[Dictionary]:
 		return properties
 
 	var params := _init_and_get_entries(sc_info.param, ParamEnt)
-	if params.is_empty():
-		return properties
+	if not params.is_empty():
+		properties.append(
+			{
+				"name": "StateChart Parameters",
+				"type": TYPE_NIL,
+				"usage": PROPERTY_USAGE_GROUP,
+				"hint_string": "p/"
+			}
+		)
 
-	properties.append(
-		{
-			"name": "StateChart Parameters",
-			"type": TYPE_NIL,
-			"usage": PROPERTY_USAGE_GROUP,
-			"hint_string": "p/"
-		}
-	)
+		for p_name in params:
+			var ent := params[p_name] as ParamEnt
+			var usage := PROPERTY_USAGE_DEFAULT
+			if ent.type_id == TYPE_NIL:
+				usage |= PROPERTY_USAGE_NIL_IS_VARIANT
+			var display_name := p_name
+			if not ent.local_state.is_empty():
+				display_name = "%s%s%s %s" % [LOCAL_PARAM_PREFIX, ent.local_state, LOCAL_PARAM_SUFFIX, p_name]
 
-	for p_name in params:
-		var ent := params[p_name] as ParamEnt
-		var usage := PROPERTY_USAGE_DEFAULT
-		if ent.type_id == TYPE_NIL:
-			usage |= PROPERTY_USAGE_NIL_IS_VARIANT
-		var display_name := p_name
-		if not ent.local_state.is_empty():
-			display_name = "%s%s%s %s" % [LOCAL_PARAM_PREFIX, ent.local_state, LOCAL_PARAM_SUFFIX, p_name]
-
-		properties.append({"name": "p/" + display_name, "type": ent.type_id, "usage": usage})
+			properties.append({"name": "p/" + display_name, "type": ent.type_id, "usage": usage})
 
 	var events := _init_and_get_entries(sc_info.event, EventEnt)
 	if not events.is_empty():
