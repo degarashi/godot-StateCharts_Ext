@@ -463,7 +463,7 @@ func _on_state_action(action: Dictionary) -> void:
 				if err == OK:
 					var result: Variant = expr.execute(prop_values, self)
 					if not expr.has_execute_failed():
-						set_expression_property(location, result)
+						_set_expression_property_untyped(location, result)
 					else:
 						push_error(
 							(
@@ -500,6 +500,12 @@ func _on_state_exited_actions(state: Node) -> void:
 			for action in actions:
 				if action is Dictionary:
 					_on_state_action(action)
+
+
+func _set_expression_property_untyped(value_name: StringName, value: Variant) -> void:
+	# Internal helper to call the base class set_expression_property and bypass the safety assert.
+	# This is used for SCXML-imported actions or internal logic.
+	super.set_expression_property(value_name, value)
 
 
 func _send_event_untyped(event: StringName) -> void:

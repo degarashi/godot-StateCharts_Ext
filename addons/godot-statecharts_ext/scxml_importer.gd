@@ -247,6 +247,7 @@ func import_scxml(path: String, root_node: Node) -> Error:
 	var scxml_name := &"Root"
 	var parsed_root_states: Array[ParsedState] = []
 	var initial_properties: Dictionary = {}
+	var params: Array[Dictionary] = []  # Discovered params during state parsing
 
 	while xml.read() == OK:
 		if xml.get_node_type() != XMLParser.NODE_ELEMENT:
@@ -268,7 +269,7 @@ func import_scxml(path: String, root_node: Node) -> Error:
 		elif node_name == "datamodel":
 			_parse_datamodel(xml, initial_properties)
 		elif node_name == "state" or node_name == "parallel" or node_name == "history":
-			parsed_root_states.append(_parse_state_element(xml, node_name, initial_properties))
+			parsed_root_states.append(_parse_state_element(xml, node_name, initial_properties, params))
 
 	root_node.initial_expression_properties = initial_properties
 	DLogger.debug("Parsed {0} root states, {1} initial properties", [parsed_root_states.size(), initial_properties.size()], "scxml_importer")
@@ -359,7 +360,12 @@ func _parse_value(expr: String) -> Variant:
 	return expr
 
 
-func _parse_state_element(xml: XMLParser, element_name: String, initial_properties: Dictionary) -> ParsedState:
+func _parse_state_element(
+	xml: XMLParser,
+	element_name: String,
+	initial_properties: Dictionary,
+	params: Array[Dictionary]
+) -> ParsedState:
 	var state_id := xml.get_named_attribute_value_safe("id")
 	if state_id.is_empty():
 		state_id = xml.get_named_attribute_value_safe("name")
@@ -388,7 +394,7 @@ func _parse_state_element(xml: XMLParser, element_name: String, initial_properti
 			XMLParser.NODE_ELEMENT:
 				var node_name := xml.get_node_name()
 				if node_name == "state" or node_name == "parallel" or node_name == "history":
-					parsed.children.append(_parse_state_element(xml, node_name, initial_properties))
+					parsed.children.append(_parse_state_element(xml, node_name, initial_properties, params))
 				elif node_name == "datamodel":
 					_parse_datamodel(xml, initial_properties)
 				elif node_name == "initial":
