@@ -25,7 +25,7 @@ var _statechart_ext_inspector_plugin: EditorInspectorPlugin
 func _enter_tree() -> void:
 	DLogger.info("Plugin enabled.", [], CAT)
 
-	var DummyImportPlugin := preload("dummy_import_plugin.gd")
+	var DummyImportPlugin := preload("uid://b70108gychlte")
 	_import_plugin = DummyImportPlugin.new(
 		"statechart_ext." + StateChartExt.SCDEF_EXTENSION,
 		"StateChart Definition",
