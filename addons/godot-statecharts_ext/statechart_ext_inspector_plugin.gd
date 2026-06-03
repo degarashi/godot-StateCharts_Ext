@@ -50,10 +50,10 @@ func _on_generate_doc_pressed() -> void:
 	var script := node.get_script()
 
 	var gd_path: String = script.resource_path
-	var scdef_path: String = gd_path.get_basename() + ".scdef"
+	var scdef_path: String = gd_path.get_basename() + StateChartExtScript.SCDEF_EXTENSION
 
 	if not FileAccess.file_exists(scdef_path):
-		printerr("Could not find .scdef for this StateChart: ", scdef_path)
+		printerr("Could not find ", StateChartExtScript.SCDEF_EXTENSION, " for this StateChart: ", scdef_path)
 		return
 
 	if not _doc_dialog:
@@ -73,7 +73,7 @@ func _on_doc_file_selected(path: String) -> void:
 		return
 
 	var gd_path: String = selected_nodes[0].get_script().resource_path
-	var scdef_path: String = gd_path.get_basename() + ".scdef"
+	var scdef_path: String = gd_path.get_basename() + StateChartExtScript.SCDEF_EXTENSION
 
 	var f := FileAccess.open(scdef_path, FileAccess.READ)
 	if not f:
