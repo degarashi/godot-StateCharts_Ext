@@ -480,6 +480,11 @@ func _parse_state_element(xml: XMLParser, element_name: String, initial_properti
 							)
 						)
 
+				elif node_name == "onentry" or node_name == "onexit":
+					var actions := _parse_executable_content(xml, node_name)
+					if not actions.is_empty():
+						parsed.metadata["statechart_ext__" + node_name] = actions
+
 				elif node_name.contains(":"):
 					# Likely foreign metadata (e.g. qt:editorinfo)
 					parsed.metadata[_sanitize_meta_key("tag:" + node_name)] = _extract_element_metadata(
@@ -491,6 +496,26 @@ func _parse_state_element(xml: XMLParser, element_name: String, initial_properti
 					return parsed
 
 	return parsed
+
+
+func _parse_executable_content(xml: XMLParser, element_name: String) -> Array[Dictionary]:
+	var actions: Array[Dictionary] = []
+	if xml.is_empty():
+		return actions
+
+	while xml.read() == OK:
+		match xml.get_node_type():
+			XMLParser.NODE_ELEMENT:
+				var node_name := xml.get_node_name()
+				if node_name == "send":
+					var event := xml.get_named_attribute_value_safe("event")
+					if not event.is_empty():
+						actions.append({"type": "send", "event": event})
+				# Other elements could be added here later
+			XMLParser.NODE_ELEMENT_END:
+				if xml.get_node_name() == element_name:
+					return actions
+	return actions
 
 
 func _sanitize_meta_key(key: String) -> String:
