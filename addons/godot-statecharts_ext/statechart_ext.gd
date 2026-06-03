@@ -1,4 +1,4 @@
-@icon("statechart_ext.svg")
+@icon("uid://wutp82auwys2")
 @tool
 ## StateChart extension with static type safety.
 ## Provides automatic code generation from .scdef files, intuitive access via Proxy objects,
