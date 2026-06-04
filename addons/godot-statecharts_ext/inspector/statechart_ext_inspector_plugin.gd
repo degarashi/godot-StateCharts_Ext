@@ -39,5 +39,3 @@ func _parse_begin(object: Object) -> void:
 		)
 		btn_reimport.pressed.connect(object.reimport_scxml)
 		add_custom_control(btn_reimport)
-
-

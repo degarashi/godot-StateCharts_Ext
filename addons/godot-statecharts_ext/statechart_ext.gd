@@ -15,6 +15,7 @@ const SCDEF_EXTENSION := "scdef"
 const GD_EXTENSION := "gd"
 const SCXML_PATH_META_KEY := "statechart_ext__scxml_path"
 
+
 # ------------- [Defines] -------------
 ## Class to inherit user-defined parameters
 class Param:
@@ -293,7 +294,9 @@ func _get_property_list() -> Array[Dictionary]:
 				usage |= PROPERTY_USAGE_NIL_IS_VARIANT
 			var display_name := p_name
 			if not ent.local_state.is_empty():
-				display_name = "%s%s%s %s" % [LOCAL_PARAM_PREFIX, ent.local_state, LOCAL_PARAM_SUFFIX, p_name]
+				display_name = (
+					"%s%s%s %s" % [LOCAL_PARAM_PREFIX, ent.local_state, LOCAL_PARAM_SUFFIX, p_name]
+				)
 
 			properties.append({"name": "p/" + display_name, "type": ent.type_id, "usage": usage})
 
@@ -322,7 +325,11 @@ func _get_property_list() -> Array[Dictionary]:
 		)
 		for ev_name in events:
 			properties.append(
-				{"name": "exc_unknown/" + ev_name, "type": TYPE_BOOL, "usage": PROPERTY_USAGE_EDITOR}
+				{
+					"name": "exc_unknown/" + ev_name,
+					"type": TYPE_BOOL,
+					"usage": PROPERTY_USAGE_EDITOR
+				}
 			)
 
 	return properties
@@ -636,10 +643,10 @@ func _get_configuration_warnings() -> PackedStringArray:
 	var event := _init_and_get_entries(sc_info.event, EventEnt)
 	var invalid_ev: PackedStringArray = []
 	var exclude_ev: PackedStringArray = []
-	
+
 	exclude_ev.append_array(exclude_unused_event)
 	exclude_ev.append_array(exclude_warn_unknown_events)
-	
+
 	for ev_name in exclude_ev:
 		if ev_name not in event:
 			invalid_ev.append(ev_name)
@@ -904,12 +911,18 @@ func _check_expression(
 		)
 
 
-func _check_event_typo(err_msg: PackedStringArray, events: Dictionary[String, EntBase], exclude_ev: PackedStringArray) -> void:
+func _check_event_typo(
+	err_msg: PackedStringArray, events: Dictionary[String, EntBase], exclude_ev: PackedStringArray
+) -> void:
 	_check_event_typo_internal(err_msg, self, "", events, exclude_ev)
 
 
 func _check_event_typo_internal(
-	err_msg: PackedStringArray, node: Node, path: String, events: Dictionary[String, EntBase], exclude_ev: PackedStringArray
+	err_msg: PackedStringArray,
+	node: Node,
+	path: String,
+	events: Dictionary[String, EntBase],
+	exclude_ev: PackedStringArray
 ) -> void:
 	for c in node.get_children():
 		var child_path := path + PATH_SEPARATOR + c.name
