@@ -305,7 +305,9 @@ func _get_property_list() -> Array[Dictionary]:
 					"%s%s%s %s" % [LOCAL_PARAM_PREFIX, ent.local_state, LOCAL_PARAM_SUFFIX, p_name]
 				)
 
-			properties.append({"name": PROP_GROUP_PARAM + display_name, "type": ent.type_id, "usage": usage})
+			properties.append(
+				{"name": PROP_GROUP_PARAM + display_name, "type": ent.type_id, "usage": usage}
+			)
 
 	var events := _init_and_get_entries(sc_info.event, EventEnt)
 	if not events.is_empty():
@@ -319,7 +321,11 @@ func _get_property_list() -> Array[Dictionary]:
 		)
 		for ev_name in events:
 			properties.append(
-				{"name": PROP_GROUP_EXC_UNUSED + ev_name, "type": TYPE_BOOL, "usage": PROPERTY_USAGE_EDITOR}
+				{
+					"name": PROP_GROUP_EXC_UNUSED + ev_name,
+					"type": TYPE_BOOL,
+					"usage": PROPERTY_USAGE_EDITOR
+				}
 			)
 
 		properties.append(
