@@ -67,8 +67,6 @@ class ParsedState:
 		metadata = metadata_a
 
 
-
-
 class PendingTransition:
 	var node: Node  # Can be Transition or HistoryState
 	var target_id: StringName
@@ -573,8 +571,8 @@ func _parse_state_element(
 
 func _parse_executable_content(
 	xml: XMLParser, element_name: String, params: Array[Dictionary] = []
-) -> Array[StateChartExt.SCXMLAction]:
-	var actions: Array[StateChartExt.SCXMLAction] = []
+) -> Array[SCXMLAction]:
+	var actions: Array[SCXMLAction] = []
 	if xml.is_empty():
 		return actions
 
@@ -622,14 +620,14 @@ func _parse_executable_content(
 								if xml.get_node_name() == "send":
 									break
 
-					actions.append(StateChartExt.SCXMLSendAction.new({"event": event, "params": send_params}))
+					actions.append(SCXMLSendAction.new({"event": event, "params": send_params}))
 				elif node_name == "assign":
 					var location := xml.get_named_attribute_value_safe("location")
 					var expr := _sanitize_assign_expression(
 						xml.get_named_attribute_value_safe("expr"), params
 					)
 					if not location.is_empty():
-						actions.append(StateChartExt.SCXMLAssignAction.new({"location": location, "expr": expr}))
+						actions.append(SCXMLAssignAction.new({"location": location, "expr": expr}))
 						# Add assigned location to known params if not exists
 						var found := false
 						for p in params:
