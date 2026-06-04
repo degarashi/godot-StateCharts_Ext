@@ -2,11 +2,12 @@ class_name SCXMLSendAction
 extends SCXMLAction
 
 # ------------- [Constants] -------------
-const KEY_EVENT := "event"
-const KEY_PARAMS := "params"
-const KEY_NAME := "name"
-const KEY_EVAL_EXPR := "eval_expr"
-const KEY_EXPR := "expr"
+class Key:
+	const EVENT := "event"
+	const PARAMS := "params"
+	const NAME := "name"
+	const EVAL_EXPR := "eval_expr"
+	const EXPR := "expr"
 
 # ------------- [Public Variable] -------------
 var event: String
@@ -16,16 +17,16 @@ var params: Array
 # ------------- [Public Method] -------------
 func _init(data: Dictionary) -> void:
 	super(StateChartExt.ACTION_TYPE_SEND)
-	event = data.get(KEY_EVENT, "")
-	params = data.get(KEY_PARAMS, [])
+	event = data.get(Key.EVENT, "")
+	params = data.get(Key.PARAMS, [])
 
 
 func execute(sc: StateChartExt) -> void:
 	if params is Array:
 		for p_data in params:
 			if p_data is Dictionary:
-				var p_name: String = p_data.get(KEY_NAME, "")
-				var expr_str: String = p_data.get(KEY_EVAL_EXPR, p_data.get(KEY_EXPR, ""))
+				var p_name: String = p_data.get(Key.NAME, "")
+				var expr_str: String = p_data.get(Key.EVAL_EXPR, p_data.get(Key.EXPR, ""))
 				if not p_name.is_empty():
 					sc._evaluate_and_assign(p_name, expr_str)
 	if not event.is_empty():
@@ -34,6 +35,6 @@ func execute(sc: StateChartExt) -> void:
 
 func to_dict() -> Dictionary:
 	var d := super()
-	d[KEY_EVENT] = event
-	d[KEY_PARAMS] = params
+	d[Key.EVENT] = event
+	d[Key.PARAMS] = params
 	return d

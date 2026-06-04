@@ -2,8 +2,9 @@ class_name SCXMLAssignAction
 extends SCXMLAction
 
 # ------------- [Constants] -------------
-const KEY_LOCATION := "location"
-const KEY_EXPR := "expr"
+class Key:
+	const LOCATION := "location"
+	const EXPR := "expr"
 
 # ------------- [Public Variable] -------------
 var location: String
@@ -12,8 +13,8 @@ var expr: String
 # ------------- [Callbacks] -------------
 func _init(data: Dictionary) -> void:
 	super(StateChartExt.ACTION_TYPE_ASSIGN)
-	location = data.get(KEY_LOCATION, "")
-	expr = data.get(KEY_EXPR, "")
+	location = data.get(Key.LOCATION, "")
+	expr = data.get(Key.EXPR, "")
 
 # ------------- [Public Method] -------------
 func execute(sc: StateChartExt) -> void:
@@ -23,6 +24,6 @@ func execute(sc: StateChartExt) -> void:
 
 func to_dict() -> Dictionary:
 	var d := super()
-	d[KEY_LOCATION] = location
-	d[KEY_EXPR] = expr
+	d[Key.LOCATION] = location
+	d[Key.EXPR] = expr
 	return d
