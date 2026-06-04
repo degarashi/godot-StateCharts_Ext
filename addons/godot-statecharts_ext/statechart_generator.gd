@@ -371,5 +371,3 @@ static func parse_and_generate(
 		return {"code": "", "error": result.error}
 
 	return {"code": _generate_script(result.class_name, result.events, result.params), "error": ""}
-
-
