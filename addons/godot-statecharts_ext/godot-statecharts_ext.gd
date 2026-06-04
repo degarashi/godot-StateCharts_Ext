@@ -217,6 +217,32 @@ func _on_scxml_import_file_selected(path: String) -> void:
 		DLogger.error("Failed to import SCXML: {0}", [err], CAT)
 
 
+func _convert_scxml_to_scdef_if_needed(scxml_path: String) -> void:
+	var scdef_path := scxml_path.get_basename() + "." + StateChartExt.SCDEF_EXTENSION
+	var scdef_content := StateChartScxmlImporter.generate_scdef(scxml_path)
+
+	if scdef_content.is_empty():
+		return
+
+	var old_content := ""
+	if FileAccess.file_exists(scdef_path):
+		var f := FileAccess.open(scdef_path, FileAccess.READ)
+		if f:
+			old_content = f.get_as_text()
+			f.close()
+
+	if scdef_content != old_content:
+		var f := FileAccess.open(scdef_path, FileAccess.WRITE)
+		if f:
+			f.store_string(scdef_content)
+			f.close()
+			DLogger.info("Auto-generated .scdef from .scxml: {0}", [scdef_path], CAT)
+			EditorInterface.get_resource_filesystem().update_file(scdef_path)
+			_process_scdef_file(scdef_path)
+		else:
+			DLogger.error("Failed to write auto-generated .scdef: {0}", [scdef_path], CAT)
+
+
 func _process_scdef_file(scdef_path: String) -> void:
 	var gd_path := scdef_path.get_basename() + "." + StateChartExt.GD_EXTENSION
 
@@ -294,9 +320,11 @@ func _scan_dir_recursive(path: String) -> void:
 			if not file_name.begins_with("."):
 				_scan_dir_recursive(path.path_join(file_name))
 		else:
+			var full_path := path.path_join(file_name)
 			if file_name.ends_with("." + StateChartExt.SCDEF_EXTENSION):
-				var full_path := path.path_join(file_name)
 				_process_scdef_file(full_path)
+			elif file_name.ends_with(".scxml"):
+				_convert_scxml_to_scdef_if_needed(full_path)
 
 		file_name = dir.get_next()
 	dir.list_dir_end()
