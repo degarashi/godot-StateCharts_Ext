@@ -71,6 +71,45 @@ class SCInfoBase:
 		return "SCINFO_BASE" in s.get_script_constant_map()
 
 
+@abstract class SCXMLAction:
+	@abstract func execute(_sc: StateChartExt) -> void
+
+
+class SCXMLSendAction:
+	extends SCXMLAction
+	var event: String
+	var params: Array
+
+	func _init(data: Dictionary) -> void:
+		event = data.get("event", "")
+		params = data.get("params", [])
+
+	func execute(sc: StateChartExt) -> void:
+		if params is Array:
+			for p_data in params:
+				if p_data is Dictionary:
+					var p_name: String = p_data.get("name", "")
+					var expr_str: String = p_data.get("eval_expr", p_data.get("expr", ""))
+					if not p_name.is_empty():
+						sc._evaluate_and_assign(p_name, expr_str)
+		if not event.is_empty():
+			sc._send_event_untyped(event)
+
+
+class SCXMLAssignAction:
+	extends SCXMLAction
+	var location: String
+	var expr: String
+
+	func _init(data: Dictionary) -> void:
+		location = data.get("location", "")
+		expr = data.get("expr", "")
+
+	func execute(sc: StateChartExt) -> void:
+		if not location.is_empty():
+			sc._evaluate_and_assign(location, expr)
+
+
 ## Internal: Base class for event or parameter entries
 class EntBase:
 	extends Resource
@@ -544,43 +583,34 @@ func _evaluate_and_assign(location: String, expr_str: String) -> void:
 		)
 
 
-func _on_state_action(action: Dictionary) -> void:
-	match action.get("type"):
+func _on_state_action(action_dict: Dictionary) -> void:
+	var action: SCXMLAction
+	match action_dict.get("type"):
 		ACTION_TYPE_SEND:
-			var event: String = action.get("event", "")
-			var send_params = action.get("params", [])
-			if send_params is Array:
-				for p_data in send_params:
-					if p_data is Dictionary:
-						var p_name: String = p_data.get("name", "")
-						var expr_str: String = p_data.get("eval_expr", p_data.get("expr", ""))
-						if not p_name.is_empty():
-							_evaluate_and_assign(p_name, expr_str)
-			if not event.is_empty():
-				_send_event_untyped(event)
+			action = SCXMLSendAction.new(action_dict)
 		ACTION_TYPE_ASSIGN:
-			var location: String = action.get("location", "")
-			var expr_str: String = action.get("expr", "")
-			if not location.is_empty():
-				_evaluate_and_assign(location, expr_str)
+			action = SCXMLAssignAction.new(action_dict)
+
+	if action:
+		action.execute(self)
 
 
 func _on_state_entered_actions(state: Node) -> void:
 	if state.has_meta(META_ON_ENTRY):
 		var actions = state.get_meta(META_ON_ENTRY)
 		if actions is Array:
-			for action in actions:
-				if action is Dictionary:
-					_on_state_action(action)
+			for action_dict in actions:
+				if action_dict is Dictionary:
+					_on_state_action(action_dict)
 
 
 func _on_state_exited_actions(state: Node) -> void:
 	if state.has_meta(META_ON_EXIT):
 		var actions = state.get_meta(META_ON_EXIT)
 		if actions is Array:
-			for action in actions:
-				if action is Dictionary:
-					_on_state_action(action)
+			for action_dict in actions:
+				if action_dict is Dictionary:
+					_on_state_action(action_dict)
 
 
 func _set_expression_property_untyped(value_name: StringName, value: Variant) -> void:
