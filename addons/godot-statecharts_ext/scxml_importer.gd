@@ -67,51 +67,6 @@ class ParsedState:
 		metadata = metadata_a
 
 
-class SCXMLAction:
-	extends RefCounted
-	var type: String
-
-	func _init(p_type: String) -> void:
-		type = p_type
-
-	func to_dict() -> Dictionary:
-		return {"type": type}
-
-
-class SCXMLSendAction:
-	extends SCXMLAction
-	const TYPE_SEND := "send"
-	var event: StringName
-	var params: Array[Dictionary]
-
-	func _init(p_event: StringName, p_params: Array[Dictionary]) -> void:
-		super(TYPE_SEND)
-		event = p_event
-		params = p_params
-
-	func to_dict() -> Dictionary:
-		var d := super()
-		d["event"] = event
-		d["params"] = params
-		return d
-
-
-class SCXMLAssignAction:
-	extends SCXMLAction
-	const TYPE_ASSIGN := "assign"
-	var location: String
-	var expr: String
-
-	func _init(p_location: String, p_expr: String) -> void:
-		super(TYPE_ASSIGN)
-		location = p_location
-		expr = p_expr
-
-	func to_dict() -> Dictionary:
-		var d := super()
-		d["location"] = location
-		d["expr"] = expr
-		return d
 
 
 class PendingTransition:
@@ -618,8 +573,8 @@ func _parse_state_element(
 
 func _parse_executable_content(
 	xml: XMLParser, element_name: String, params: Array[Dictionary] = []
-) -> Array[SCXMLAction]:
-	var actions: Array[SCXMLAction] = []
+) -> Array[StateChartExt.SCXMLAction]:
+	var actions: Array[StateChartExt.SCXMLAction] = []
 	if xml.is_empty():
 		return actions
 
@@ -667,14 +622,14 @@ func _parse_executable_content(
 								if xml.get_node_name() == "send":
 									break
 
-					actions.append(SCXMLSendAction.new(event, send_params))
+					actions.append(StateChartExt.SCXMLSendAction.new({"event": event, "params": send_params}))
 				elif node_name == "assign":
 					var location := xml.get_named_attribute_value_safe("location")
 					var expr := _sanitize_assign_expression(
 						xml.get_named_attribute_value_safe("expr"), params
 					)
 					if not location.is_empty():
-						actions.append(SCXMLAssignAction.new(location, expr))
+						actions.append(StateChartExt.SCXMLAssignAction.new({"location": location, "expr": expr}))
 						# Add assigned location to known params if not exists
 						var found := false
 						for p in params:

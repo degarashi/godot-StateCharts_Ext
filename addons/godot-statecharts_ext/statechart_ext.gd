@@ -72,7 +72,15 @@ class SCInfoBase:
 
 
 @abstract class SCXMLAction:
+	var type: String
+
+	func _init(p_type: String) -> void:
+		type = p_type
+
 	@abstract func execute(_sc: StateChartExt) -> void
+
+	func to_dict() -> Dictionary:
+		return {"type": type}
 
 
 class SCXMLSendAction:
@@ -81,6 +89,7 @@ class SCXMLSendAction:
 	var params: Array
 
 	func _init(data: Dictionary) -> void:
+		super(StateChartExt.ACTION_TYPE_SEND)
 		event = data.get("event", "")
 		params = data.get("params", [])
 
@@ -95,6 +104,12 @@ class SCXMLSendAction:
 		if not event.is_empty():
 			sc._send_event_untyped(event)
 
+	func to_dict() -> Dictionary:
+		var d := super()
+		d["event"] = event
+		d["params"] = params
+		return d
+
 
 class SCXMLAssignAction:
 	extends SCXMLAction
@@ -102,12 +117,19 @@ class SCXMLAssignAction:
 	var expr: String
 
 	func _init(data: Dictionary) -> void:
+		super(StateChartExt.ACTION_TYPE_ASSIGN)
 		location = data.get("location", "")
 		expr = data.get("expr", "")
 
 	func execute(sc: StateChartExt) -> void:
 		if not location.is_empty():
 			sc._evaluate_and_assign(location, expr)
+
+	func to_dict() -> Dictionary:
+		var d := super()
+		d["location"] = location
+		d["expr"] = expr
+		return d
 
 
 ## Internal: Base class for event or parameter entries
