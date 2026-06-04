@@ -489,47 +489,59 @@ func _on_state_exited(state: Node) -> void:
 	DLogger.debug("State exited (Post): {0}", [state.name], CAT, self)
 
 
+func _evaluate_and_assign(location: String, expr_str: String) -> void:
+	var expr := Expression.new()
+	# Collect all current properties as context for expression evaluation
+	var props := _expression_properties
+	var prop_names := props.keys()
+	var prop_values: Array = []
+	for p in prop_names:
+		prop_values.append(props[p])
+
+	var err := expr.parse(expr_str, prop_names)
+	if err == OK:
+		var result: Variant = expr.execute(prop_values, self)
+		if not expr.has_execute_failed():
+			_set_expression_property_untyped(location, result)
+		else:
+			push_error(
+				(
+					"StateChartExt: Failed to execute assign expression: "
+					+ expr_str
+					+ " Error: "
+					+ expr.get_error_text()
+				)
+			)
+	else:
+		push_error(
+			(
+				"StateChartExt: Failed to parse assign expression: "
+				+ expr_str
+				+ " Error: "
+				+ expr.get_error_text()
+			)
+		)
+
+
 func _on_state_action(action: Dictionary) -> void:
 	match action.get("type"):
 		"send":
 			var event: String = action.get("event", "")
+			var send_params = action.get("params", [])
+			if send_params is Array:
+				for p_data in send_params:
+					if p_data is Dictionary:
+						var p_name: String = p_data.get("name", "")
+						var expr_str: String = p_data.get("expr", "")
+						if not p_name.is_empty():
+							_evaluate_and_assign(p_name, expr_str)
 			if not event.is_empty():
 				_send_event_untyped(event)
 		"assign":
 			var location: String = action.get("location", "")
 			var expr_str: String = action.get("expr", "")
 			if not location.is_empty():
-				var expr := Expression.new()
-				# Collect all current properties as context for expression evaluation
-				var props := _expression_properties
-				var prop_names := props.keys()
-				var prop_values: Array = []
-				for p in prop_names:
-					prop_values.append(props[p])
-
-				var err := expr.parse(expr_str, prop_names)
-				if err == OK:
-					var result: Variant = expr.execute(prop_values, self)
-					if not expr.has_execute_failed():
-						_set_expression_property_untyped(location, result)
-					else:
-						push_error(
-							(
-								"StateChartExt: Failed to execute assign expression: "
-								+ expr_str
-								+ " Error: "
-								+ expr.get_error_text()
-							)
-						)
-				else:
-					push_error(
-						(
-							"StateChartExt: Failed to parse assign expression: "
-							+ expr_str
-							+ " Error: "
-							+ expr.get_error_text()
-						)
-					)
+				_evaluate_and_assign(location, expr_str)
 
 
 func _on_state_entered_actions(state: Node) -> void:

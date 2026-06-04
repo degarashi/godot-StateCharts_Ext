@@ -563,6 +563,7 @@ func _parse_executable_content(xml: XMLParser, element_name: String, params: Arr
 				var node_name := xml.get_node_name()
 				if node_name == "send":
 					var event := xml.get_named_attribute_value_safe("event")
+					var send_params: Array[Dictionary] = []
 					if not xml.is_empty():
 						# Read children of send (e.g. <param>)
 						while xml.read() == OK:
@@ -573,7 +574,7 @@ func _parse_executable_content(xml: XMLParser, element_name: String, params: Arr
 									if p_name.is_empty(): p_name = xml.get_named_attribute_value_safe("id")
 									var p_expr := _sanitize_assign_expression(xml.get_named_attribute_value_safe("expr"), params)
 									if not p_name.is_empty():
-										actions.append({"type": "assign", "location": p_name, "expr": p_expr})
+										send_params.append({"name": p_name, "expr": p_expr})
 										# Add assigned location to known params if not exists
 										var found := false
 										for p in params:
@@ -586,8 +587,7 @@ func _parse_executable_content(xml: XMLParser, element_name: String, params: Arr
 								if xml.get_node_name() == "send":
 									break
 					
-					if not event.is_empty():
-						actions.append({"type": "send", "event": event})
+					actions.append({"type": "send", "event": event, "params": send_params})
 				elif node_name == "assign":
 					var location := xml.get_named_attribute_value_safe("location")
 					var expr := _sanitize_assign_expression(xml.get_named_attribute_value_safe("expr"), params)
