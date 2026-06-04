@@ -747,16 +747,6 @@ func _generate_transition_name(event: String, target: String) -> String:
 	return "Transition"
 
 
-func _skip_element(xml: XMLParser, element_name: String) -> void:
-	if xml.is_empty():
-		return
-	while xml.read() == OK:
-		match xml.get_node_type():
-			XMLParser.NODE_ELEMENT_END:
-				if xml.get_node_name() == element_name:
-					return
-
-
 func _parse_transition_target(target_attr: String) -> StringName:
 	var target_ids := target_attr.split(" ", false)
 	if target_ids.is_empty():
