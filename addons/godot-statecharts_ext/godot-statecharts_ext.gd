@@ -431,6 +431,15 @@ class ScExtSceneTreeContextMenuPlugin:
 				"Import SCXML...", _on_import_clicked.bind(target_nodes).unbind(1), icon_import
 			)
 
+			var icon_open := _plugin.get_editor_interface().get_base_control().get_theme_icon(
+				"Edit", "EditorIcons"
+			)
+			add_context_menu_item(
+				"Open associated .scdef",
+				_on_open_scdef_clicked.bind(target_nodes).unbind(1),
+				icon_open
+			)
+
 	func _on_export_clicked(nodes: Array[Node]) -> void:
 		var selection := _plugin.get_editor_interface().get_selection()
 		selection.clear()
@@ -444,3 +453,14 @@ class ScExtSceneTreeContextMenuPlugin:
 		for node in nodes:
 			selection.add_node(node)
 		_plugin.call("_on_import_scxml_requested")
+
+	func _on_open_scdef_clicked(nodes: Array[Node]) -> void:
+		for node in nodes:
+			var script := node.get_script() as Script
+			if not script:
+				continue
+			var script_path := script.get_path()
+			var scdef_path := script_path.get_basename() + "." + StateChartExt.SCDEF_EXTENSION
+			if FileAccess.file_exists(scdef_path):
+				_plugin.get_editor_interface().edit_resource(load(scdef_path))
+				break
