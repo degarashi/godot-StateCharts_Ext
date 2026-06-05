@@ -64,7 +64,8 @@ class SCInfoBase:
 
 ## Internal: Base class for event or parameter entries
 class EntBase:
-	var name: StringName
+	extends Resource
+	@export var name: StringName
 
 
 ## Internal: Single event entry
@@ -83,7 +84,7 @@ class ParamEnt:
 	var local_state: StringName
 
 	func _init(
-		typ: int,
+		typ: int = TYPE_NIL,
 		notify_map: Dictionary = {},
 		init_val: Variant = StateChartExt._s_none_value,
 		loc_state: StringName = &""
@@ -237,13 +238,13 @@ static var _entries_cache: Dictionary = {}
 		_update_debug_event_connection()
 
 ## Exception list for unused event warnings
-@export var exclude_unused_event: Array[StringName] = []:
+@export var exclude_unused_event: Array[EventEnt] = []:
 	set(value):
 		exclude_unused_event = value
 		update_configuration_warnings()
 
 ## Exception list for unknown event warnings
-@export var exclude_warn_unknown_events: Array[StringName] = []:
+@export var exclude_warn_unknown_events: Array[EventEnt] = []:
 	set(value):
 		exclude_warn_unknown_events = value
 		update_configuration_warnings()
@@ -297,6 +298,34 @@ func _get_property_list() -> Array[Dictionary]:
 
 		properties.append({"name": "p/" + display_name, "type": ent.type_id, "usage": usage})
 
+	var events := _init_and_get_entries(sc_info.event, EventEnt)
+	if not events.is_empty():
+		properties.append(
+			{
+				"name": "Exclude Unused Warnings",
+				"type": TYPE_NIL,
+				"usage": PROPERTY_USAGE_GROUP,
+				"hint_string": "exc_unused/"
+			}
+		)
+		for ev_name in events:
+			properties.append(
+				{"name": "exc_unused/" + ev_name, "type": TYPE_BOOL, "usage": PROPERTY_USAGE_EDITOR}
+			)
+
+		properties.append(
+			{
+				"name": "Exclude Unknown Warnings",
+				"type": TYPE_NIL,
+				"usage": PROPERTY_USAGE_GROUP,
+				"hint_string": "exc_unknown/"
+			}
+		)
+		for ev_name in events:
+			properties.append(
+				{"name": "exc_unknown/" + ev_name, "type": TYPE_BOOL, "usage": PROPERTY_USAGE_EDITOR}
+			)
+
 	return properties
 
 
@@ -305,6 +334,8 @@ func _validate_property(property: Dictionary) -> void:
 		# Hide the base dictionary from the inspector since we have the p/ properties.
 		# We keep STORAGE so it's still saved and the base class can use it.
 		property.usage = PROPERTY_USAGE_STORAGE
+	elif property.name == "exclude_unused_event" or property.name == "exclude_warn_unknown_events":
+		property.usage = PROPERTY_USAGE_STORAGE
 
 
 func _get(property: StringName) -> Variant:
@@ -312,6 +343,20 @@ func _get(property: StringName) -> Variant:
 		return _e_dyn
 	if property == &"p":
 		return _p_dyn
+
+	if property.begins_with("exc_unused/"):
+		var ev_name := property.trim_prefix("exc_unused/")
+		for ev in exclude_unused_event:
+			if is_instance_valid(ev) and ev.name == ev_name:
+				return true
+		return false
+
+	if property.begins_with("exc_unknown/"):
+		var ev_name := property.trim_prefix("exc_unknown/")
+		for ev in exclude_warn_unknown_events:
+			if is_instance_valid(ev) and ev.name == ev_name:
+				return true
+		return false
 
 	if property.begins_with("p/"):
 		var p_name := property.trim_prefix("p/")
@@ -351,6 +396,18 @@ func _set(property: StringName, value: Variant) -> bool:
 		return true
 	if property == &"p":
 		_p_dyn = value
+		return true
+
+	if property.begins_with("exc_unused/"):
+		var ev_name := property.trim_prefix("exc_unused/")
+		_update_exclusion_list(exclude_unused_event, ev_name, value)
+		update_configuration_warnings()
+		return true
+
+	if property.begins_with("exc_unknown/"):
+		var ev_name := property.trim_prefix("exc_unknown/")
+		_update_exclusion_list(exclude_warn_unknown_events, ev_name, value)
+		update_configuration_warnings()
 		return true
 
 	if property.begins_with("p/"):
@@ -430,7 +487,9 @@ func _ready() -> void:
 		DLogger.debug("Initialized", [], CAT, self)
 
 	if OS.is_debug_build():
-		_valid_event_names.append_array(exclude_warn_unknown_events)
+		for ev in exclude_warn_unknown_events:
+			if is_instance_valid(ev):
+				_valid_event_names.append(ev.name)
 
 
 func _on_state_entered(state: Node) -> void:
@@ -575,12 +634,14 @@ func _get_configuration_warnings() -> PackedStringArray:
 	var event := _init_and_get_entries(sc_info.event, EventEnt)
 	var invalid_ev: PackedStringArray = []
 	var exclude_ev: PackedStringArray = []
-	var chk_events_exist := func(src: Array[StringName]) -> void:
-		for ev_name in src:
+	var chk_events_exist := func(src: Array[EventEnt]) -> void:
+		for ev in src:
+			if not is_instance_valid(ev):
+				continue
+			var ev_name := ev.name
+			exclude_ev.append(ev_name)
 			if ev_name not in event:
 				invalid_ev.append(ev_name)
-			else:
-				exclude_ev.append(ev_name)
 
 	chk_events_exist.call(exclude_unused_event)
 	chk_events_exist.call(exclude_warn_unknown_events)
@@ -590,7 +651,7 @@ func _get_configuration_warnings() -> PackedStringArray:
 		err_str += ", ".join(invalid_ev)
 		warnings.append(err_str)
 	if not event.is_empty():
-		_check_event_typo(warnings, event)
+		_check_event_typo(warnings, event, exclude_ev)
 		_check_unused_events(warnings, event, exclude_ev)
 
 	warnings.append_array(super())
@@ -845,20 +906,20 @@ func _check_expression(
 		)
 
 
-func _check_event_typo(err_msg: PackedStringArray, events: Dictionary[String, EntBase]) -> void:
-	_check_event_typo_internal(err_msg, self, "", events)
+func _check_event_typo(err_msg: PackedStringArray, events: Dictionary[String, EntBase], exclude_ev: PackedStringArray) -> void:
+	_check_event_typo_internal(err_msg, self, "", events, exclude_ev)
 
 
 func _check_event_typo_internal(
-	err_msg: PackedStringArray, node: Node, path: String, events: Dictionary[String, EntBase]
+	err_msg: PackedStringArray, node: Node, path: String, events: Dictionary[String, EntBase], exclude_ev: PackedStringArray
 ) -> void:
 	for c in node.get_children():
 		var child_path := path + PATH_SEPARATOR + c.name
 		if c is Transition:
-			if not c.event.is_empty() and c.event not in events:
+			if not c.event.is_empty() and c.event not in events and c.event not in exclude_ev:
 				err_msg.append("Unknown event: {1}\n at [{0}]".format([child_path, c.event]))
 		else:
-			_check_event_typo_internal(err_msg, c, child_path, events)
+			_check_event_typo_internal(err_msg, c, child_path, events, exclude_ev)
 
 
 func _find_expression_guard(
@@ -877,6 +938,23 @@ func _find_expression_guard(
 				ret.append_array(_find_expression_guard(warnings, path, gc))
 			return ret
 	return []
+
+
+func _update_exclusion_list(list: Array[EventEnt], ev_name: StringName, enabled: bool) -> void:
+	var found_idx := -1
+	for i in range(list.size()):
+		if is_instance_valid(list[i]) and list[i].name == ev_name:
+			found_idx = i
+			break
+
+	if enabled:
+		if found_idx == -1:
+			var ent := EventEnt.new()
+			ent.name = ev_name
+			list.append(ent)
+	else:
+		if found_idx != -1:
+			list.remove_at(found_idx)
 
 
 func _update_all_warnings(node: Node) -> void:
