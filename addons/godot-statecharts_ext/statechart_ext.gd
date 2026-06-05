@@ -287,7 +287,11 @@ func _get_property_list() -> Array[Dictionary]:
 		var usage := PROPERTY_USAGE_DEFAULT
 		if ent.type_id == TYPE_NIL:
 			usage |= PROPERTY_USAGE_NIL_IS_VARIANT
-		properties.append({"name": "p/" + p_name, "type": ent.type_id, "usage": usage})
+		var display_name := p_name
+		if not ent.local_state.is_empty():
+			display_name = "[L: %s] %s" % [ent.local_state, p_name]
+
+		properties.append({"name": "p/" + display_name, "type": ent.type_id, "usage": usage})
 
 	return properties
 
@@ -307,6 +311,10 @@ func _get(property: StringName) -> Variant:
 
 	if property.begins_with("p/"):
 		var p_name := property.trim_prefix("p/")
+		if p_name.begins_with("[L: "):
+			var close_bracket := p_name.find("] ")
+			if close_bracket != -1:
+				p_name = p_name.substr(close_bracket + 2)
 		var sc_info := get_sc_info()
 		if sc_info != null:
 			var params := _init_and_get_entries(sc_info.param, ParamEnt)
@@ -343,6 +351,10 @@ func _set(property: StringName, value: Variant) -> bool:
 
 	if property.begins_with("p/"):
 		var p_name := property.trim_prefix("p/")
+		if p_name.begins_with("[L: "):
+			var close_bracket := p_name.find("] ")
+			if close_bracket != -1:
+				p_name = p_name.substr(close_bracket + 2)
 		var sc_info := get_sc_info()
 		if sc_info != null:
 			var params := _init_and_get_entries(sc_info.param, ParamEnt)
