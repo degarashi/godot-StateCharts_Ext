@@ -238,13 +238,13 @@ static var _entries_cache: Dictionary = {}
 		_update_debug_event_connection()
 
 ## Exception list for unused event warnings
-@export var exclude_unused_event: Array[EventEnt] = []:
+@export var exclude_unused_event: Array[StringName] = []:
 	set(value):
 		exclude_unused_event = value
 		update_configuration_warnings()
 
 ## Exception list for unknown event warnings
-@export var exclude_warn_unknown_events: Array[EventEnt] = []:
+@export var exclude_warn_unknown_events: Array[StringName] = []:
 	set(value):
 		exclude_warn_unknown_events = value
 		update_configuration_warnings()
@@ -343,18 +343,10 @@ func _get(property: StringName) -> Variant:
 		return _p_dyn
 
 	if property.begins_with("exc_unused/"):
-		var ev_name := property.trim_prefix("exc_unused/")
-		for ev in exclude_unused_event:
-			if is_instance_valid(ev) and ev.name == ev_name:
-				return true
-		return false
+		return property.trim_prefix("exc_unused/") in exclude_unused_event
 
 	if property.begins_with("exc_unknown/"):
-		var ev_name := property.trim_prefix("exc_unknown/")
-		for ev in exclude_warn_unknown_events:
-			if is_instance_valid(ev) and ev.name == ev_name:
-				return true
-		return false
+		return property.trim_prefix("exc_unknown/") in exclude_warn_unknown_events
 
 	if property.begins_with("p/"):
 		var p_name := property.trim_prefix("p/")
@@ -485,9 +477,8 @@ func _ready() -> void:
 		DLogger.debug("Initialized", [], CAT, self)
 
 	if OS.is_debug_build():
-		for ev in exclude_warn_unknown_events:
-			if is_instance_valid(ev):
-				_valid_event_names.append(ev.name)
+		for ev_name in exclude_warn_unknown_events:
+			_valid_event_names.append(ev_name)
 
 
 func _on_state_entered(state: Node) -> void:
@@ -632,17 +623,13 @@ func _get_configuration_warnings() -> PackedStringArray:
 	var event := _init_and_get_entries(sc_info.event, EventEnt)
 	var invalid_ev: PackedStringArray = []
 	var exclude_ev: PackedStringArray = []
-	var chk_events_exist := func(src: Array[EventEnt]) -> void:
-		for ev in src:
-			if not is_instance_valid(ev):
-				continue
-			var ev_name := ev.name
-			exclude_ev.append(ev_name)
-			if ev_name not in event:
-				invalid_ev.append(ev_name)
-
-	chk_events_exist.call(exclude_unused_event)
-	chk_events_exist.call(exclude_warn_unknown_events)
+	
+	exclude_ev.append_array(exclude_unused_event)
+	exclude_ev.append_array(exclude_warn_unknown_events)
+	
+	for ev_name in exclude_ev:
+		if ev_name not in event:
+			invalid_ev.append(ev_name)
 
 	if not invalid_ev.is_empty():
 		var err_str := "invalid event name (exclude):\n"
@@ -938,21 +925,12 @@ func _find_expression_guard(
 	return []
 
 
-func _update_exclusion_list(list: Array[EventEnt], ev_name: StringName, enabled: bool) -> void:
-	var found_idx := -1
-	for i in range(list.size()):
-		if is_instance_valid(list[i]) and list[i].name == ev_name:
-			found_idx = i
-			break
-
+func _update_exclusion_list(list: Array[StringName], ev_name: StringName, enabled: bool) -> void:
 	if enabled:
-		if found_idx == -1:
-			var ent := EventEnt.new()
-			ent.name = ev_name
-			list.append(ent)
+		if ev_name not in list:
+			list.append(ev_name)
 	else:
-		if found_idx != -1:
-			list.remove_at(found_idx)
+		list.erase(ev_name)
 
 
 func _update_all_warnings(node: Node) -> void:
