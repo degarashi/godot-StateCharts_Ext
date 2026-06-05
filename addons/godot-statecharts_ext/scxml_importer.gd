@@ -184,9 +184,12 @@ static func _add_param_from_xml(id: String, expr: String, params: Array[Dictiona
 	if not state_stack.is_empty():
 		local_state = state_stack.back()
 
-	# Avoid duplicates in the same scope (or global)
+	# Unify by name to avoid duplicate definitions in .scdef (which Proxy API doesn't allow)
 	for p in params:
-		if p.name == id and p.local == local_state:
+		if p["name"] == id:
+			if p["local"] != local_state:
+				# If name is used in multiple scopes, make it global
+				p["local"] = ""
 			return
 
 	params.append(
@@ -229,7 +232,7 @@ static func _extract_params_from_cond(cond: String, params: Array[Dictionary]) -
 
 	var known_params: Dictionary[String, bool] = {}
 	for p in params:
-		known_params[p.name] = true
+		known_params[p["name"]] = true
 
 	var reserved := ["true", "false", "null", "In", "not", "and", "or"]
 
@@ -550,6 +553,29 @@ func _parse_executable_content(xml: XMLParser, element_name: String, params: Arr
 				var node_name := xml.get_node_name()
 				if node_name == "send":
 					var event := xml.get_named_attribute_value_safe("event")
+					if not xml.is_empty():
+						# Read children of send (e.g. <param>)
+						while xml.read() == OK:
+							var child_type := xml.get_node_type()
+							if child_type == XMLParser.NODE_ELEMENT:
+								if xml.get_node_name() == "param":
+									var p_name := xml.get_named_attribute_value_safe("name")
+									if p_name.is_empty(): p_name = xml.get_named_attribute_value_safe("id")
+									var p_expr := xml.get_named_attribute_value_safe("expr")
+									if not p_name.is_empty():
+										actions.append({"type": "assign", "location": p_name, "expr": p_expr})
+										# Add assigned location to known params if not exists
+										var found := false
+										for p in params:
+											if p.name == p_name:
+												found = true
+												break
+										if not found:
+											params.append({"name": p_name, "type": "variant", "expr": "null", "local": ""})
+							elif child_type == XMLParser.NODE_ELEMENT_END:
+								if xml.get_node_name() == "send":
+									break
+					
 					if not event.is_empty():
 						actions.append({"type": "send", "event": event})
 				elif node_name == "assign":
