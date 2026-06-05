@@ -21,6 +21,9 @@ var _transition_inspector_plugin: EditorInspectorPlugin
 var _statechart_ext_inspector_plugin: EditorInspectorPlugin
 var _scxml_context_menu_plugin: EditorContextMenuPlugin
 
+var _scxml_export_dialog: EditorFileDialog
+var _scxml_import_dialog: EditorFileDialog
+
 
 # ------------- [Lifecycle Methods] -------------
 func _enter_tree() -> void:
@@ -112,10 +115,6 @@ func _on_manual_scan_requested() -> void:
 	EditorInterface.get_resource_filesystem().scan()
 	_scan_and_generate()
 	DLogger.info("Manual scan finished.", [], CAT)
-
-
-var _scxml_export_dialog: EditorFileDialog
-var _scxml_import_dialog: EditorFileDialog
 
 
 func _on_export_scxml_requested() -> void:
