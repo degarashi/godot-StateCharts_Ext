@@ -568,7 +568,7 @@ func _add_history(msg: String) -> void:
 
 	var timestamp := Time.get_time_string_from_system()
 	_runtime_history.insert(0, "[{0}] {1}".format([timestamp, msg]))
-	if _runtime_history.size() > 10:
+	if _runtime_history.size() > history_limit:
 		_runtime_history.pop_back()
 	notify_property_list_changed()
 
@@ -1243,3 +1243,7 @@ func get_expression_property(value_name: StringName, default_val: Variant = null
 
 func send_event(event: StringName) -> void:
 	assert(false, "send_event({0}) called. Use the _ext version instead.".format([event]))
+
+
+## Maximum number of history entries to keep.
+@export var history_limit := 10
