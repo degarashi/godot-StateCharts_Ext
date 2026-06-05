@@ -571,7 +571,7 @@ func _parse_executable_content(xml: XMLParser, element_name: String, params: Arr
 								if xml.get_node_name() == "param":
 									var p_name := xml.get_named_attribute_value_safe("name")
 									if p_name.is_empty(): p_name = xml.get_named_attribute_value_safe("id")
-									var p_expr := xml.get_named_attribute_value_safe("expr")
+									var p_expr := _sanitize_assign_expression(xml.get_named_attribute_value_safe("expr"), params)
 									if not p_name.is_empty():
 										actions.append({"type": "assign", "location": p_name, "expr": p_expr})
 										# Add assigned location to known params if not exists
@@ -590,7 +590,7 @@ func _parse_executable_content(xml: XMLParser, element_name: String, params: Arr
 						actions.append({"type": "send", "event": event})
 				elif node_name == "assign":
 					var location := xml.get_named_attribute_value_safe("location")
-					var expr := xml.get_named_attribute_value_safe("expr")
+					var expr := _sanitize_assign_expression(xml.get_named_attribute_value_safe("expr"), params)
 					if not location.is_empty():
 						actions.append({"type": "assign", "location": location, "expr": expr})
 						# Add assigned location to known params if not exists
@@ -606,6 +606,39 @@ func _parse_executable_content(xml: XMLParser, element_name: String, params: Arr
 				if xml.get_node_name() == element_name:
 					return actions
 	return actions
+
+
+static func _sanitize_assign_expression(expr: String, params: Array[Dictionary]) -> String:
+	expr = expr.strip_edges()
+	if expr.is_empty():
+		return expr
+
+	# Already quoted?
+	if (
+		(expr.begins_with("'") and expr.ends_with("'"))
+		or (expr.begins_with('"') and expr.ends_with('"'))
+	):
+		return expr
+
+	# Reserved words or literals
+	if expr.to_lower() in ["true", "false", "null"] or expr.is_valid_float() or expr.is_valid_int():
+		return expr
+
+	# If it's a simple identifier (like Title, Playing)
+	var identifier_regex := RegEx.new()
+	identifier_regex.compile("^[a-zA-Z_][a-zA-Z0-9_]*$")
+	if identifier_regex.search(expr):
+		# Check if it matches a known parameter name
+		var is_param := false
+		for p in params:
+			if p.get("name") == expr:
+				is_param = true
+				break
+		if not is_param:
+			# Treat as a string literal and quote it
+			return '"%s"' % expr.replace('"', '\\"')
+
+	return expr
 
 
 func _sanitize_meta_key(key: String) -> String:
