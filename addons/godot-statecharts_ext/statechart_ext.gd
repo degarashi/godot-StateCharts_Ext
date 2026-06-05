@@ -14,6 +14,13 @@ const PATH_SEPARATOR := "/"
 const SCDEF_EXTENSION := "scdef"
 const GD_EXTENSION := "gd"
 const SCXML_PATH_META_KEY := "statechart_ext__scxml_path"
+const PROP_GROUP_PARAM := "p/"
+const PROP_GROUP_EXC_UNUSED := "exc_unused/"
+const PROP_GROUP_EXC_UNKNOWN := "exc_unknown/"
+const ACTION_TYPE_SEND := "send"
+const ACTION_TYPE_ASSIGN := "assign"
+const META_ON_ENTRY := "statechart_ext__onentry"
+const META_ON_EXIT := "statechart_ext__onexit"
 
 
 # ------------- [Defines] -------------
@@ -283,7 +290,7 @@ func _get_property_list() -> Array[Dictionary]:
 				"name": "StateChart Parameters",
 				"type": TYPE_NIL,
 				"usage": PROPERTY_USAGE_GROUP,
-				"hint_string": "p/"
+				"hint_string": PROP_GROUP_PARAM
 			}
 		)
 
@@ -298,7 +305,7 @@ func _get_property_list() -> Array[Dictionary]:
 					"%s%s%s %s" % [LOCAL_PARAM_PREFIX, ent.local_state, LOCAL_PARAM_SUFFIX, p_name]
 				)
 
-			properties.append({"name": "p/" + display_name, "type": ent.type_id, "usage": usage})
+			properties.append({"name": PROP_GROUP_PARAM + display_name, "type": ent.type_id, "usage": usage})
 
 	var events := _init_and_get_entries(sc_info.event, EventEnt)
 	if not events.is_empty():
@@ -307,12 +314,12 @@ func _get_property_list() -> Array[Dictionary]:
 				"name": "Exclude Unused Warnings",
 				"type": TYPE_NIL,
 				"usage": PROPERTY_USAGE_GROUP,
-				"hint_string": "exc_unused/"
+				"hint_string": PROP_GROUP_EXC_UNUSED
 			}
 		)
 		for ev_name in events:
 			properties.append(
-				{"name": "exc_unused/" + ev_name, "type": TYPE_BOOL, "usage": PROPERTY_USAGE_EDITOR}
+				{"name": PROP_GROUP_EXC_UNUSED + ev_name, "type": TYPE_BOOL, "usage": PROPERTY_USAGE_EDITOR}
 			)
 
 		properties.append(
@@ -320,13 +327,13 @@ func _get_property_list() -> Array[Dictionary]:
 				"name": "Exclude Unknown Warnings",
 				"type": TYPE_NIL,
 				"usage": PROPERTY_USAGE_GROUP,
-				"hint_string": "exc_unknown/"
+				"hint_string": PROP_GROUP_EXC_UNKNOWN
 			}
 		)
 		for ev_name in events:
 			properties.append(
 				{
-					"name": "exc_unknown/" + ev_name,
+					"name": PROP_GROUP_EXC_UNKNOWN + ev_name,
 					"type": TYPE_BOOL,
 					"usage": PROPERTY_USAGE_EDITOR
 				}
@@ -350,14 +357,14 @@ func _get(property: StringName) -> Variant:
 	if property == &"p":
 		return _p_dyn
 
-	if property.begins_with("exc_unused/"):
-		return property.trim_prefix("exc_unused/") in exclude_unused_event
+	if property.begins_with(PROP_GROUP_EXC_UNUSED):
+		return property.trim_prefix(PROP_GROUP_EXC_UNUSED) in exclude_unused_event
 
-	if property.begins_with("exc_unknown/"):
-		return property.trim_prefix("exc_unknown/") in exclude_warn_unknown_events
+	if property.begins_with(PROP_GROUP_EXC_UNKNOWN):
+		return property.trim_prefix(PROP_GROUP_EXC_UNKNOWN) in exclude_warn_unknown_events
 
-	if property.begins_with("p/"):
-		var p_name := property.trim_prefix("p/")
+	if property.begins_with(PROP_GROUP_PARAM):
+		var p_name := property.trim_prefix(PROP_GROUP_PARAM)
 		if p_name.begins_with(LOCAL_PARAM_PREFIX):
 			var close_bracket := p_name.find(LOCAL_PARAM_SUFFIX)
 			if close_bracket != -1:
@@ -396,20 +403,20 @@ func _set(property: StringName, value: Variant) -> bool:
 		_p_dyn = value
 		return true
 
-	if property.begins_with("exc_unused/"):
-		var ev_name := property.trim_prefix("exc_unused/")
+	if property.begins_with(PROP_GROUP_EXC_UNUSED):
+		var ev_name := property.trim_prefix(PROP_GROUP_EXC_UNUSED)
 		_update_exclusion_list(exclude_unused_event, ev_name, value)
 		update_configuration_warnings()
 		return true
 
-	if property.begins_with("exc_unknown/"):
-		var ev_name := property.trim_prefix("exc_unknown/")
+	if property.begins_with(PROP_GROUP_EXC_UNKNOWN):
+		var ev_name := property.trim_prefix(PROP_GROUP_EXC_UNKNOWN)
 		_update_exclusion_list(exclude_warn_unknown_events, ev_name, value)
 		update_configuration_warnings()
 		return true
 
-	if property.begins_with("p/"):
-		var p_name := property.trim_prefix("p/")
+	if property.begins_with(PROP_GROUP_PARAM):
+		var p_name := property.trim_prefix(PROP_GROUP_PARAM)
 		if p_name.begins_with(LOCAL_PARAM_PREFIX):
 			var close_bracket := p_name.find(LOCAL_PARAM_SUFFIX)
 			if close_bracket != -1:
@@ -533,7 +540,7 @@ func _evaluate_and_assign(location: String, expr_str: String) -> void:
 
 func _on_state_action(action: Dictionary) -> void:
 	match action.get("type"):
-		"send":
+		ACTION_TYPE_SEND:
 			var event: String = action.get("event", "")
 			var send_params = action.get("params", [])
 			if send_params is Array:
@@ -545,7 +552,7 @@ func _on_state_action(action: Dictionary) -> void:
 							_evaluate_and_assign(p_name, expr_str)
 			if not event.is_empty():
 				_send_event_untyped(event)
-		"assign":
+		ACTION_TYPE_ASSIGN:
 			var location: String = action.get("location", "")
 			var expr_str: String = action.get("expr", "")
 			if not location.is_empty():
@@ -553,8 +560,8 @@ func _on_state_action(action: Dictionary) -> void:
 
 
 func _on_state_entered_actions(state: Node) -> void:
-	if state.has_meta("statechart_ext__onentry"):
-		var actions = state.get_meta("statechart_ext__onentry")
+	if state.has_meta(META_ON_ENTRY):
+		var actions = state.get_meta(META_ON_ENTRY)
 		if actions is Array:
 			for action in actions:
 				if action is Dictionary:
@@ -562,8 +569,8 @@ func _on_state_entered_actions(state: Node) -> void:
 
 
 func _on_state_exited_actions(state: Node) -> void:
-	if state.has_meta("statechart_ext__onexit"):
-		var actions = state.get_meta("statechart_ext__onexit")
+	if state.has_meta(META_ON_EXIT):
+		var actions = state.get_meta(META_ON_EXIT)
 		if actions is Array:
 			for action in actions:
 				if action is Dictionary:
