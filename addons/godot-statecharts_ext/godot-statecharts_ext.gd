@@ -19,6 +19,7 @@ var _import_plugin: EditorImportPlugin
 var _scxml_import_plugin: EditorImportPlugin
 var _transition_inspector_plugin: EditorInspectorPlugin
 var _statechart_ext_inspector_plugin: EditorInspectorPlugin
+var _scxml_context_menu_plugin: EditorContextMenuPlugin
 
 
 # ------------- [Lifecycle Methods] -------------
@@ -47,6 +48,11 @@ func _enter_tree() -> void:
 	add_tool_menu_item(MENU_FORCE_REGENERATE, _manual_scan)
 	add_tool_menu_item(MENU_CONVERT_SCXML, _manual_convert_scxml_to_scdef)
 
+	_scxml_context_menu_plugin = ScxmlFileSystemContextMenuPlugin.new(self)
+	add_context_menu_plugin(
+		EditorContextMenuPlugin.CONTEXT_SLOT_FILESYSTEM, _scxml_context_menu_plugin
+	)
+
 	# Wait for the filesystem to be fully loaded before initial scan
 	var timer := get_tree().create_timer(1.0)
 	timer.timeout.connect(_on_filesystem_changed)
@@ -68,6 +74,10 @@ func _exit_tree() -> void:
 	if _statechart_ext_inspector_plugin:
 		remove_inspector_plugin(_statechart_ext_inspector_plugin)
 		_statechart_ext_inspector_plugin = null
+
+	if _scxml_context_menu_plugin:
+		remove_context_menu_plugin(_scxml_context_menu_plugin)
+		_scxml_context_menu_plugin = null
 
 	remove_tool_menu_item(MENU_FORCE_REGENERATE)
 	remove_tool_menu_item(MENU_EXPORT_SCXML)
@@ -326,3 +336,33 @@ func _scan_dir_recursive(path: String) -> void:
 
 		file_name = dir.get_next()
 	dir.list_dir_end()
+
+
+# ------------- [Inner Classes] -------------
+class ScxmlFileSystemContextMenuPlugin:
+	extends EditorContextMenuPlugin
+
+	var _plugin: EditorPlugin
+
+	func _init(p: EditorPlugin) -> void:
+		_plugin = p
+
+	func _popup_menu(paths: PackedStringArray) -> void:
+		var scxml_paths: PackedStringArray = []
+		for path in paths:
+			if path.ends_with(".scxml"):
+				scxml_paths.append(path)
+
+		if not scxml_paths.is_empty():
+			var icon := _plugin.get_editor_interface().get_base_control().get_theme_icon(
+				"Object", "EditorIcons"
+			)
+			add_context_menu_item(
+				"Convert SCXML to ." + StateChartExt.SCDEF_EXTENSION,
+				_on_convert_clicked.bind(scxml_paths),
+				icon
+			)
+
+	func _on_convert_clicked(paths: PackedStringArray) -> void:
+		for path in paths:
+			_plugin.call("_on_scxml_convert_file_selected", path)
