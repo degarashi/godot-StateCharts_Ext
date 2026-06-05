@@ -108,10 +108,11 @@ static func generate_scdef(path: String) -> String:
 		if node_type == XMLParser.NODE_ELEMENT:
 			var node_name := xml.get_node_name()
 			if node_name == "state" or node_name == "parallel":
-				var state_id := xml.get_named_attribute_value_safe("id")
-				if state_id.is_empty():
-					state_id = xml.get_named_attribute_value_safe("name")
-				state_stack.append(state_id)
+				if not xml.is_empty():
+					var state_id := xml.get_named_attribute_value_safe("id")
+					if state_id.is_empty():
+						state_id = xml.get_named_attribute_value_safe("name")
+					state_stack.append(state_id)
 			elif node_name == "scxml":
 				var scxml_name := xml.get_named_attribute_value_safe("name")
 				if not scxml_name.is_empty():
@@ -187,7 +188,16 @@ static func _add_param_from_xml(id: String, expr: String, params: Array[Dictiona
 	# Unify by name to avoid duplicate definitions in .scdef (which Proxy API doesn't allow)
 	for p in params:
 		if p["name"] == id:
-			if p["local"] != local_state:
+			# Update type and initial expression with the concrete definition from <data>
+			if p["type"] == "variant" or type_str != "variant":
+				p["type"] = type_str
+			if p["expr"].is_empty() or p["expr"] == "null":
+				p["expr"] = val_str
+			
+			# Resolve local state scope
+			if p["local"].is_empty():
+				p["local"] = local_state
+			elif p["local"] != local_state:
 				# If name is used in multiple scopes, make it global
 				p["local"] = ""
 			return
