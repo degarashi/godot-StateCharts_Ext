@@ -9,6 +9,7 @@ const NAME_ATTR_NAME := "%s:name" % EXT_NAMESPACE_PREFIX
 const GUARD_JSON_ATTR_NAME := "%s:guard_json" % EXT_NAMESPACE_PREFIX
 const UID_ATTR_NAME := "%s:uid" % EXT_NAMESPACE_PREFIX
 const UID_META_KEY := "statechart_ext__uid"
+const SCXML_PATH_META_KEY := "statechart_ext__scxml_path"
 
 const ExpressionGuardScript := preload("res://addons/godot_state_charts/expression_guard.gd")
 const StateIsActiveGuardScript := preload(
@@ -343,6 +344,7 @@ func import_scxml(path: String, root_node: Node) -> Error:
 		root_node.reset_internal_state()
 
 	_clear_existing_statechart_nodes(root_node)
+	root_node.set_meta(SCXML_PATH_META_KEY, path)
 
 	var scxml_initial := StringName()
 	var scxml_name := &"Root"

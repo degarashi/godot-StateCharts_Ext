@@ -13,6 +13,7 @@ const LOCAL_PARAM_SUFFIX := "] "
 const PATH_SEPARATOR := "/"
 const SCDEF_EXTENSION := "scdef"
 const GD_EXTENSION := "gd"
+const SCXML_PATH_META_KEY := "statechart_ext__scxml_path"
 
 # ------------- [Defines] -------------
 ## Class to inherit user-defined parameters
@@ -974,6 +975,18 @@ func reset_internal_state() -> void:
 	_any_state_entered = false
 	_context_state_stack.clear()
 	_state_local_params.clear()
+
+
+## Re-imports the SCXML from the path stored in metadata.
+func reimport_scxml() -> void:
+	if not Engine.is_editor_hint():
+		return
+	var path := str(get_meta(SCXML_PATH_META_KEY, ""))
+	if path.is_empty():
+		DLogger.warn("No SCXML path stored in metadata.", [], CAT, self)
+		return
+	var importer := StateChartScxmlImporter.new()
+	importer.import_scxml(path, self)
 
 
 ## Manually check for configuration warnings.

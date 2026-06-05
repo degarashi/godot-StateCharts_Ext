@@ -15,7 +15,7 @@ func _can_handle(object: Object) -> bool:
 	return object is StateChartExtScript
 
 
-func _parse_begin(_object: Object) -> void:
+func _parse_begin(object: Object) -> void:
 	var btn_export := Button.new()
 	btn_export.text = "Export to SCXML..."
 	btn_export.icon = _plugin.get_editor_interface().get_base_control().get_theme_icon(
@@ -31,6 +31,15 @@ func _parse_begin(_object: Object) -> void:
 	)
 	btn_import.pressed.connect(_plugin._manual_import_scxml)
 	add_custom_control(btn_import)
+
+	if object.has_meta(StateChartExtScript.SCXML_PATH_META_KEY):
+		var btn_reimport := Button.new()
+		btn_reimport.text = "Re-import SCXML"
+		btn_reimport.icon = _plugin.get_editor_interface().get_base_control().get_theme_icon(
+			"Reload", "EditorIcons"
+		)
+		btn_reimport.pressed.connect(object.reimport_scxml)
+		add_custom_control(btn_reimport)
 
 	var btn_doc := Button.new()
 	btn_doc.text = "Generate Markdown Doc..."
