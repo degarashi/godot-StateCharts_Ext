@@ -20,6 +20,7 @@ var _scxml_import_plugin: EditorImportPlugin
 var _transition_inspector_plugin: EditorInspectorPlugin
 var _statechart_ext_inspector_plugin: EditorInspectorPlugin
 var _context_menu_plugin: EditorContextMenuPlugin
+var _scene_tree_context_menu_plugin: EditorContextMenuPlugin
 
 var _scxml_export_dialog: EditorFileDialog
 var _scxml_import_dialog: EditorFileDialog
@@ -49,10 +50,17 @@ func _enter_tree() -> void:
 		fs.sources_changed.connect(_on_sources_changed)
 
 	add_tool_menu_item(MENU_FORCE_REGENERATE, _on_manual_scan_requested)
+	add_tool_menu_item(MENU_EXPORT_SCXML, _on_export_scxml_requested)
+	add_tool_menu_item(MENU_IMPORT_SCXML, _on_import_scxml_requested)
 	add_tool_menu_item(MENU_CONVERT_SCXML, _on_convert_scxml_to_scdef_requested)
 
 	_context_menu_plugin = ScExtFileSystemContextMenuPlugin.new(self)
 	add_context_menu_plugin(EditorContextMenuPlugin.CONTEXT_SLOT_FILESYSTEM, _context_menu_plugin)
+
+	_scene_tree_context_menu_plugin = ScExtSceneTreeContextMenuPlugin.new(self)
+	add_context_menu_plugin(
+		EditorContextMenuPlugin.CONTEXT_SLOT_SCENE_TREE, _scene_tree_context_menu_plugin
+	)
 
 	# Wait for the filesystem to be fully loaded before initial scan
 	var timer := get_tree().create_timer(1.0)
@@ -79,6 +87,10 @@ func _exit_tree() -> void:
 	if _context_menu_plugin:
 		remove_context_menu_plugin(_context_menu_plugin)
 		_context_menu_plugin = null
+
+	if _scene_tree_context_menu_plugin:
+		remove_context_menu_plugin(_scene_tree_context_menu_plugin)
+		_scene_tree_context_menu_plugin = null
 
 	remove_tool_menu_item(MENU_FORCE_REGENERATE)
 	remove_tool_menu_item(MENU_EXPORT_SCXML)
@@ -360,7 +372,7 @@ class ScExtFileSystemContextMenuPlugin:
 			)
 			add_context_menu_item(
 				"Convert SCXML to ." + StateChartExt.SCDEF_EXTENSION,
-				_on_convert_clicked.bind(scxml_paths),
+				_on_convert_clicked.bind(scxml_paths).unbind(1),
 				icon
 			)
 
@@ -369,7 +381,9 @@ class ScExtFileSystemContextMenuPlugin:
 				"Script", "EditorIcons"
 			)
 			add_context_menu_item(
-				"Regenerate GDScript", _on_regenerate_clicked.bind(scdef_paths), icon
+				"Regenerate GDScript",
+				_on_regenerate_clicked.bind(scdef_paths).unbind(1),
+				icon
 			)
 
 	func _on_convert_clicked(paths: PackedStringArray) -> void:
@@ -379,3 +393,54 @@ class ScExtFileSystemContextMenuPlugin:
 	func _on_regenerate_clicked(paths: PackedStringArray) -> void:
 		for path in paths:
 			_plugin.call("_process_scdef_file", path)
+
+
+class ScExtSceneTreeContextMenuPlugin:
+	extends EditorContextMenuPlugin
+
+	var _plugin: EditorPlugin
+
+	func _init(p: EditorPlugin) -> void:
+		_plugin = p
+
+	func _popup_menu(paths: PackedStringArray) -> void:
+		var edited_root := _plugin.get_editor_interface().get_edited_scene_root()
+		if not edited_root:
+			return
+
+		var target_nodes: Array[Node] = []
+		for path in paths:
+			var node := edited_root.get_node_or_null(path)
+			if node is StateChartExt:
+				target_nodes.append(node)
+
+		if not target_nodes.is_empty():
+			var icon_export := _plugin.get_editor_interface().get_base_control().get_theme_icon(
+				"Save", "EditorIcons"
+			)
+			add_context_menu_item(
+				"Export to SCXML...",
+				_on_export_clicked.bind(target_nodes).unbind(1),
+				icon_export
+			)
+
+			var icon_import := _plugin.get_editor_interface().get_base_control().get_theme_icon(
+				"Load", "EditorIcons"
+			)
+			add_context_menu_item(
+				"Import SCXML...", _on_import_clicked.bind(target_nodes).unbind(1), icon_import
+			)
+
+	func _on_export_clicked(nodes: Array[Node]) -> void:
+		var selection := _plugin.get_editor_interface().get_selection()
+		selection.clear()
+		for node in nodes:
+			selection.add_node(node)
+		_plugin.call("_on_export_scxml_requested")
+
+	func _on_import_clicked(nodes: Array[Node]) -> void:
+		var selection := _plugin.get_editor_interface().get_selection()
+		selection.clear()
+		for node in nodes:
+			selection.add_node(node)
+		_plugin.call("_on_import_scxml_requested")
