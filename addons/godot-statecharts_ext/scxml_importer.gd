@@ -157,6 +157,8 @@ static func generate_scdef(path: String) -> String:
 				var cond_attr := xml.get_named_attribute_value_safe("cond")
 				if not cond_attr.is_empty():
 					_extract_params_from_cond(cond_attr, params)
+			elif node_name == "onentry" or node_name == "onexit":
+				_extract_events_from_executable_content(xml, node_name, events)
 		elif node_type == XMLParser.NODE_ELEMENT_END:
 			var node_name := xml.get_node_name()
 			if node_name == "state" or node_name == "parallel":
@@ -180,6 +182,22 @@ static func generate_scdef(path: String) -> String:
 			lines.append("param %s %s = %s%s" % [p["name"], p["type"], p["expr"], opt_str])
 
 	return "\n".join(lines)
+
+
+static func _extract_events_from_executable_content(xml: XMLParser, element_name: String, events: Dictionary[String, bool]) -> void:
+	if xml.is_empty():
+		return
+	while xml.read() == OK:
+		var node_type := xml.get_node_type()
+		if node_type == XMLParser.NODE_ELEMENT:
+			var node_name := xml.get_node_name()
+			if node_name == "send":
+				var event := xml.get_named_attribute_value_safe("event")
+				if not event.is_empty():
+					events[event] = true
+		elif node_type == XMLParser.NODE_ELEMENT_END:
+			if xml.get_node_name() == element_name:
+				return
 
 
 static func _extract_params_from_cond(cond: String, params: Array[Dictionary]) -> void:
