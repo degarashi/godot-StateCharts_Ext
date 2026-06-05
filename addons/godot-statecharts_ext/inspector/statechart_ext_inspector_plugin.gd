@@ -20,7 +20,7 @@ func _parse_begin(object: Object) -> void:
 	btn_export.icon = _plugin.get_editor_interface().get_base_control().get_theme_icon(
 		"Save", "EditorIcons"
 	)
-	btn_export.pressed.connect(_plugin._manual_export_scxml)
+	btn_export.pressed.connect(_plugin._on_export_scxml_requested)
 	add_custom_control(btn_export)
 
 	var btn_import := Button.new()
@@ -28,7 +28,7 @@ func _parse_begin(object: Object) -> void:
 	btn_import.icon = _plugin.get_editor_interface().get_base_control().get_theme_icon(
 		"Load", "EditorIcons"
 	)
-	btn_import.pressed.connect(_plugin._manual_import_scxml)
+	btn_import.pressed.connect(_plugin._on_import_scxml_requested)
 	add_custom_control(btn_import)
 
 	if object.has_meta(StateChartExtScript.SCXML_PATH_META_KEY):

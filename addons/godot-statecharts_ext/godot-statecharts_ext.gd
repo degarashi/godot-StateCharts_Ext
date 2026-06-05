@@ -45,8 +45,8 @@ func _enter_tree() -> void:
 	if fs.has_signal("sources_changed"):
 		fs.sources_changed.connect(_on_sources_changed)
 
-	add_tool_menu_item(MENU_FORCE_REGENERATE, _manual_scan)
-	add_tool_menu_item(MENU_CONVERT_SCXML, _manual_convert_scxml_to_scdef)
+	add_tool_menu_item(MENU_FORCE_REGENERATE, _on_manual_scan_requested)
+	add_tool_menu_item(MENU_CONVERT_SCXML, _on_convert_scxml_to_scdef_requested)
 
 	_scxml_context_menu_plugin = ScxmlFileSystemContextMenuPlugin.new(self)
 	add_context_menu_plugin(
@@ -107,7 +107,7 @@ func _on_sources_changed(_exist: bool) -> void:
 
 
 # ------------- [Private Methods] -------------
-func _manual_scan() -> void:
+func _on_manual_scan_requested() -> void:
 	DLogger.info("Manual scan started...", [], CAT)
 	EditorInterface.get_resource_filesystem().scan()
 	_scan_and_generate()
@@ -118,7 +118,7 @@ var _scxml_export_dialog: EditorFileDialog
 var _scxml_import_dialog: EditorFileDialog
 
 
-func _manual_export_scxml() -> void:
+func _on_export_scxml_requested() -> void:
 	var selected_nodes := EditorInterface.get_selection().get_selected_nodes()
 	if selected_nodes.is_empty() or not selected_nodes[0] is StateChartExt:
 		DLogger.warn("Select a StateChartExt node to export.", [], CAT)
@@ -149,7 +149,7 @@ func _on_scxml_export_file_selected(path: String) -> void:
 		DLogger.error("Failed to export SCXML: {0}", [err], CAT)
 
 
-func _manual_import_scxml() -> void:
+func _on_import_scxml_requested() -> void:
 	var selected_nodes := EditorInterface.get_selection().get_selected_nodes()
 	if selected_nodes.is_empty() or not selected_nodes[0] is StateChartExt:
 		DLogger.warn("Select a StateChartExt node to import SCXML into.", [], CAT)
@@ -165,7 +165,7 @@ func _manual_import_scxml() -> void:
 	_scxml_import_dialog.popup_centered_ratio(0.5)
 
 
-func _manual_convert_scxml_to_scdef() -> void:
+func _on_convert_scxml_to_scdef_requested() -> void:
 	if not _scxml_import_dialog:
 		_scxml_import_dialog = EditorFileDialog.new()
 		_scxml_import_dialog.file_mode = EditorFileDialog.FILE_MODE_OPEN_FILE
