@@ -17,6 +17,7 @@ const SCXML_PATH_META_KEY := "statechart_ext__scxml_path"
 const PROP_GROUP_PARAM := "p/"
 const PROP_GROUP_EXC_UNUSED := "exc_unused/"
 const PROP_GROUP_EXC_UNKNOWN := "exc_unknown/"
+const PROP_GROUP_HISTORY := "runtime_history/"
 const ACTION_TYPE_SEND := "send"
 const ACTION_TYPE_ASSIGN := "assign"
 const META_ON_ENTRY := "statechart_ext__onentry"
@@ -280,6 +281,8 @@ var _state_local_params: Dictionary = {}
 var _e_dyn: EventProxy
 ## Internal: Dynamic parameter proxy
 var _p_dyn: ParamProxy
+## History of state transitions (runtime only)
+var _runtime_history: Array[String] = []
 
 
 # ------------- [Callbacks] -------------
@@ -351,6 +354,24 @@ func _get_property_list() -> Array[Dictionary]:
 				}
 			)
 
+	if not _runtime_history.is_empty():
+		properties.append(
+			{
+				"name": "Runtime History (Latest first)",
+				"type": TYPE_NIL,
+				"usage": PROPERTY_USAGE_GROUP,
+				"hint_string": PROP_GROUP_HISTORY
+			}
+		)
+		for i in range(_runtime_history.size()):
+			properties.append(
+				{
+					"name": PROP_GROUP_HISTORY + str(i),
+					"type": TYPE_STRING,
+					"usage": PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_READ_ONLY
+				}
+			)
+
 	return properties
 
 
@@ -374,6 +395,12 @@ func _get(property: StringName) -> Variant:
 
 	if property.begins_with(PROP_GROUP_EXC_UNKNOWN):
 		return property.trim_prefix(PROP_GROUP_EXC_UNKNOWN) in exclude_warn_unknown_events
+
+	if property.begins_with(PROP_GROUP_HISTORY):
+		var idx := property.trim_prefix(PROP_GROUP_HISTORY).to_int()
+		if idx >= 0 and idx < _runtime_history.size():
+			return _runtime_history[idx]
+		return ""
 
 	if property.begins_with(PROP_GROUP_PARAM):
 		var p_name := property.trim_prefix(PROP_GROUP_PARAM)
@@ -509,19 +536,36 @@ func _ready() -> void:
 
 
 func _on_state_entered(state: Node) -> void:
+	var msg := "Entered: {0}".format([state.name])
 	if debug_log:
 		DLogger.debug("State entered (Post): {0}", [state.name], CAT, self)
 	if runtime_visualization:
 		state.set_meta("statechart_ext_original_name", state.name)
 		state.name = "▶ " + state.name
 
+	_add_history(msg)
+
 
 func _on_state_exited(state: Node) -> void:
+	var msg := "Exited: {0}".format([state.name])
 	if debug_log:
 		DLogger.debug("State exited (Post): {0}", [state.name], CAT, self)
 	if runtime_visualization:
 		if state.has_meta("statechart_ext_original_name"):
 			state.name = state.get_meta("statechart_ext_original_name")
+
+	_add_history(msg)
+
+
+func _add_history(msg: String) -> void:
+	if Engine.is_editor_hint():
+		return
+
+	var timestamp := Time.get_time_string_from_system()
+	_runtime_history.insert(0, "[{0}] {1}".format([timestamp, msg]))
+	if _runtime_history.size() > 10:
+		_runtime_history.pop_back()
+	notify_property_list_changed()
 
 
 func _evaluate_and_assign(location: String, expr_str: String) -> void:
