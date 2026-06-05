@@ -19,7 +19,7 @@ var _import_plugin: EditorImportPlugin
 var _scxml_import_plugin: EditorImportPlugin
 var _transition_inspector_plugin: EditorInspectorPlugin
 var _statechart_ext_inspector_plugin: EditorInspectorPlugin
-var _scxml_context_menu_plugin: EditorContextMenuPlugin
+var _context_menu_plugin: EditorContextMenuPlugin
 
 var _scxml_export_dialog: EditorFileDialog
 var _scxml_import_dialog: EditorFileDialog
@@ -51,10 +51,8 @@ func _enter_tree() -> void:
 	add_tool_menu_item(MENU_FORCE_REGENERATE, _on_manual_scan_requested)
 	add_tool_menu_item(MENU_CONVERT_SCXML, _on_convert_scxml_to_scdef_requested)
 
-	_scxml_context_menu_plugin = ScxmlFileSystemContextMenuPlugin.new(self)
-	add_context_menu_plugin(
-		EditorContextMenuPlugin.CONTEXT_SLOT_FILESYSTEM, _scxml_context_menu_plugin
-	)
+	_context_menu_plugin = ScExtFileSystemContextMenuPlugin.new(self)
+	add_context_menu_plugin(EditorContextMenuPlugin.CONTEXT_SLOT_FILESYSTEM, _context_menu_plugin)
 
 	# Wait for the filesystem to be fully loaded before initial scan
 	var timer := get_tree().create_timer(1.0)
@@ -78,9 +76,9 @@ func _exit_tree() -> void:
 		remove_inspector_plugin(_statechart_ext_inspector_plugin)
 		_statechart_ext_inspector_plugin = null
 
-	if _scxml_context_menu_plugin:
-		remove_context_menu_plugin(_scxml_context_menu_plugin)
-		_scxml_context_menu_plugin = null
+	if _context_menu_plugin:
+		remove_context_menu_plugin(_context_menu_plugin)
+		_context_menu_plugin = null
 
 	remove_tool_menu_item(MENU_FORCE_REGENERATE)
 	remove_tool_menu_item(MENU_EXPORT_SCXML)
@@ -339,7 +337,7 @@ func _scan_dir_recursive(path: String) -> void:
 
 
 # ------------- [Inner Classes] -------------
-class ScxmlFileSystemContextMenuPlugin:
+class ScExtFileSystemContextMenuPlugin:
 	extends EditorContextMenuPlugin
 
 	var _plugin: EditorPlugin
@@ -349,9 +347,12 @@ class ScxmlFileSystemContextMenuPlugin:
 
 	func _popup_menu(paths: PackedStringArray) -> void:
 		var scxml_paths: PackedStringArray = []
+		var scdef_paths: PackedStringArray = []
 		for path in paths:
 			if path.ends_with(".scxml"):
 				scxml_paths.append(path)
+			elif path.ends_with("." + StateChartExt.SCDEF_EXTENSION):
+				scdef_paths.append(path)
 
 		if not scxml_paths.is_empty():
 			var icon := _plugin.get_editor_interface().get_base_control().get_theme_icon(
@@ -363,6 +364,18 @@ class ScxmlFileSystemContextMenuPlugin:
 				icon
 			)
 
+		if not scdef_paths.is_empty():
+			var icon := _plugin.get_editor_interface().get_base_control().get_theme_icon(
+				"Script", "EditorIcons"
+			)
+			add_context_menu_item(
+				"Regenerate GDScript", _on_regenerate_clicked.bind(scdef_paths), icon
+			)
+
 	func _on_convert_clicked(paths: PackedStringArray) -> void:
 		for path in paths:
 			_plugin.call("_on_scxml_convert_file_selected", path)
+
+	func _on_regenerate_clicked(paths: PackedStringArray) -> void:
+		for path in paths:
+			_plugin.call("_process_scdef_file", path)
