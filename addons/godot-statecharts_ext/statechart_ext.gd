@@ -509,7 +509,12 @@ func _ready() -> void:
 	var sc_info := get_sc_info()
 	if sc_info != null:
 		var params := _init_and_get_entries(sc_info.param, ParamEnt)
-		_init_and_get_entries(sc_info.event, EventEnt)
+		var events := _init_and_get_entries(sc_info.event, EventEnt)
+
+		if OS.is_debug_build():
+			for ev_name in events:
+				if ev_name not in _valid_event_names:
+					_valid_event_names.append(ev_name)
 
 		for p_name in params:
 			var ent := params[p_name] as ParamEnt
