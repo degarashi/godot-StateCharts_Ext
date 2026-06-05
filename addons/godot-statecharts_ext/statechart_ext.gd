@@ -532,7 +532,7 @@ func _on_state_action(action: Dictionary) -> void:
 				for p_data in send_params:
 					if p_data is Dictionary:
 						var p_name: String = p_data.get("name", "")
-						var expr_str: String = p_data.get("expr", "")
+						var expr_str: String = p_data.get("eval_expr", p_data.get("expr", ""))
 						if not p_name.is_empty():
 							_evaluate_and_assign(p_name, expr_str)
 			if not event.is_empty():

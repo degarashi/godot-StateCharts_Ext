@@ -572,9 +572,13 @@ func _parse_executable_content(xml: XMLParser, element_name: String, params: Arr
 								if xml.get_node_name() == "param":
 									var p_name := xml.get_named_attribute_value_safe("name")
 									if p_name.is_empty(): p_name = xml.get_named_attribute_value_safe("id")
-									var p_expr := _sanitize_assign_expression(xml.get_named_attribute_value_safe("expr"), params)
+									var p_expr := xml.get_named_attribute_value_safe("expr").strip_edges()
+									var p_eval_expr := _sanitize_assign_expression(p_expr, params)
 									if not p_name.is_empty():
-										send_params.append({"name": p_name, "expr": p_expr})
+										var p_data := {"name": p_name, "expr": p_expr}
+										if p_eval_expr != p_expr:
+											p_data["eval_expr"] = p_eval_expr
+										send_params.append(p_data)
 										# Add assigned location to known params if not exists
 										var found := false
 										for p in params:
