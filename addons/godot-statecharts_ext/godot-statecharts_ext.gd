@@ -187,6 +187,7 @@ func _on_scxml_convert_file_selected(path: String) -> void:
 			DLogger.info("Generated .scdef: {0}", [scdef_path], CAT)
 			EditorInterface.get_resource_filesystem().update_file(scdef_path)
 			_process_scdef_file(scdef_path)
+			EditorInterface.select_file(scdef_path)
 		else:
 			DLogger.error("Failed to write .scdef: {0}", [scdef_path], CAT)
 	else:
