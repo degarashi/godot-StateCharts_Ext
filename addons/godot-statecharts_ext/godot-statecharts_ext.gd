@@ -45,8 +45,6 @@ func _enter_tree() -> void:
 		fs.sources_changed.connect(_on_sources_changed)
 
 	add_tool_menu_item(MENU_FORCE_REGENERATE, _manual_scan)
-	add_tool_menu_item(MENU_EXPORT_SCXML, _manual_export_scxml)
-	add_tool_menu_item(MENU_IMPORT_SCXML, _manual_import_scxml)
 	add_tool_menu_item(MENU_CONVERT_SCXML, _manual_convert_scxml_to_scdef)
 
 	# Wait for the filesystem to be fully loaded before initial scan

@@ -66,6 +66,53 @@ class ParsedState:
 		metadata = metadata_a
 
 
+class SCXMLAction:
+	extends RefCounted
+	var type: String
+
+	func _init(p_type: String) -> void:
+		type = p_type
+
+	func to_dict() -> Dictionary:
+		return {"type": type}
+
+
+class SCXMLSendAction:
+	extends SCXMLAction
+	const TYPE_SEND := "send"
+	var event: StringName
+	var params: Array[Dictionary]
+
+	func _init(p_event: StringName, p_params: Array[Dictionary]) -> void:
+		super(TYPE_SEND)
+		event = p_event
+		params = p_params
+
+	func to_dict() -> Dictionary:
+		var d := super()
+		d["event"] = event
+		d["params"] = params
+		return d
+
+
+class SCXMLAssignAction:
+	extends SCXMLAction
+	const TYPE_ASSIGN := "assign"
+	var location: String
+	var expr: String
+
+	func _init(p_location: String, p_expr: String) -> void:
+		super(TYPE_ASSIGN)
+		location = p_location
+		expr = p_expr
+
+	func to_dict() -> Dictionary:
+		var d := super()
+		d["location"] = location
+		d["expr"] = expr
+		return d
+
+
 class PendingTransition:
 	var node: Node  # Can be Transition or HistoryState
 	var target_id: StringName
@@ -161,7 +208,9 @@ static func generate_scdef(path: String) -> String:
 	return "\n".join(lines)
 
 
-static func _add_param_from_xml(id: String, expr: String, params: Array[Dictionary], state_stack: Array[String]) -> void:
+static func _add_param_from_xml(
+	id: String, expr: String, params: Array[Dictionary], state_stack: Array[String]
+) -> void:
 	var type_str := "variant"
 	var val_str := expr
 	if (
@@ -180,7 +229,7 @@ static func _add_param_from_xml(id: String, expr: String, params: Array[Dictiona
 		# Default to string for unquoted identifiers/literals to avoid compile errors
 		type_str = "string"
 		val_str = '"%s"' % expr.replace('"', '\\"')
-	
+
 	var local_state := ""
 	if not state_stack.is_empty():
 		local_state = state_stack.back()
@@ -193,7 +242,7 @@ static func _add_param_from_xml(id: String, expr: String, params: Array[Dictiona
 				p["type"] = type_str
 			if p["expr"].is_empty() or p["expr"] == "null":
 				p["expr"] = val_str
-			
+
 			# Resolve local state scope
 			if p["local"].is_empty():
 				p["local"] = local_state
@@ -202,12 +251,16 @@ static func _add_param_from_xml(id: String, expr: String, params: Array[Dictiona
 				p["local"] = ""
 			return
 
-	params.append(
-		{"name": id, "type": type_str, "expr": val_str, "local": local_state}
-	)
+	params.append({"name": id, "type": type_str, "expr": val_str, "local": local_state})
 
 
-static func _extract_events_from_executable_content(xml: XMLParser, element_name: String, events: Dictionary[String, bool], params: Array[Dictionary], state_stack: Array[String]) -> void:
+static func _extract_events_from_executable_content(
+	xml: XMLParser,
+	element_name: String,
+	events: Dictionary[String, bool],
+	params: Array[Dictionary],
+	state_stack: Array[String]
+) -> void:
 	if xml.is_empty():
 		return
 	while xml.read() == OK:
@@ -317,10 +370,16 @@ func import_scxml(path: String, root_node: Node) -> Error:
 		elif node_name == "datamodel":
 			_parse_datamodel(xml, initial_properties)
 		elif node_name == "state" or node_name == "parallel" or node_name == "history":
-			parsed_root_states.append(_parse_state_element(xml, node_name, initial_properties, params))
+			parsed_root_states.append(
+				_parse_state_element(xml, node_name, initial_properties, params)
+			)
 
 	root_node.initial_expression_properties = initial_properties
-	DLogger.debug("Parsed {0} root states, {1} initial properties", [parsed_root_states.size(), initial_properties.size()], "scxml_importer")
+	DLogger.debug(
+		"Parsed {0} root states, {1} initial properties",
+		[parsed_root_states.size(), initial_properties.size()],
+		"scxml_importer"
+	)
 
 	if not parsed_root_states.is_empty():
 		var state_by_id: Dictionary[StringName, StateChartState] = {}
@@ -344,7 +403,9 @@ func import_scxml(path: String, root_node: Node) -> Error:
 			_instantiate_state_tree(synthetic_root, root_node, state_by_id, pending_transitions)
 
 		_resolve_pending_transitions(pending_transitions, state_by_id)
-		DLogger.debug("Resolved {0} pending transitions", [pending_transitions.size()], "scxml_importer")
+		DLogger.debug(
+			"Resolved {0} pending transitions", [pending_transitions.size()], "scxml_importer"
+		)
 		_restore_connections(root_node, saved_connections)
 
 	if root_node is StateChartExt:
@@ -409,10 +470,7 @@ func _parse_value(expr: String) -> Variant:
 
 
 func _parse_state_element(
-	xml: XMLParser,
-	element_name: String,
-	initial_properties: Dictionary,
-	params: Array[Dictionary]
+	xml: XMLParser, element_name: String, initial_properties: Dictionary, params: Array[Dictionary]
 ) -> ParsedState:
 	var state_id := xml.get_named_attribute_value_safe("id")
 	if state_id.is_empty():
@@ -442,7 +500,9 @@ func _parse_state_element(
 			XMLParser.NODE_ELEMENT:
 				var node_name := xml.get_node_name()
 				if node_name == "state" or node_name == "parallel" or node_name == "history":
-					parsed.children.append(_parse_state_element(xml, node_name, initial_properties, params))
+					parsed.children.append(
+						_parse_state_element(xml, node_name, initial_properties, params)
+					)
 				elif node_name == "datamodel":
 					_parse_datamodel(xml, initial_properties)
 				elif node_name == "initial":
@@ -537,7 +597,9 @@ func _parse_state_element(
 				elif node_name == "onentry" or node_name == "onexit":
 					var actions := _parse_executable_content(xml, node_name, params)
 					if not actions.is_empty():
-						parsed.metadata["statechart_ext__" + node_name] = actions
+						parsed.metadata["statechart_ext__" + node_name] = actions.map(
+							func(a): return a.to_dict()
+						)
 
 				elif node_name.contains(":"):
 					# Likely foreign metadata (e.g. qt:editorinfo)
@@ -552,8 +614,10 @@ func _parse_state_element(
 	return parsed
 
 
-func _parse_executable_content(xml: XMLParser, element_name: String, params: Array[Dictionary] = []) -> Array[Dictionary]:
-	var actions: Array[Dictionary] = []
+func _parse_executable_content(
+	xml: XMLParser, element_name: String, params: Array[Dictionary] = []
+) -> Array[SCXMLAction]:
+	var actions: Array[SCXMLAction] = []
 	if xml.is_empty():
 		return actions
 
@@ -571,8 +635,11 @@ func _parse_executable_content(xml: XMLParser, element_name: String, params: Arr
 							if child_type == XMLParser.NODE_ELEMENT:
 								if xml.get_node_name() == "param":
 									var p_name := xml.get_named_attribute_value_safe("name")
-									if p_name.is_empty(): p_name = xml.get_named_attribute_value_safe("id")
-									var p_expr := xml.get_named_attribute_value_safe("expr").strip_edges()
+									if p_name.is_empty():
+										p_name = xml.get_named_attribute_value_safe("id")
+									var p_expr := (
+										xml.get_named_attribute_value_safe("expr").strip_edges()
+									)
 									var p_eval_expr := _sanitize_assign_expression(p_expr, params)
 									if not p_name.is_empty():
 										var p_data := {"name": p_name, "expr": p_expr}
@@ -586,17 +653,26 @@ func _parse_executable_content(xml: XMLParser, element_name: String, params: Arr
 												found = true
 												break
 										if not found:
-											params.append({"name": p_name, "type": "variant", "expr": "null", "local": ""})
+											params.append(
+												{
+													"name": p_name,
+													"type": "variant",
+													"expr": "null",
+													"local": ""
+												}
+											)
 							elif child_type == XMLParser.NODE_ELEMENT_END:
 								if xml.get_node_name() == "send":
 									break
-					
-					actions.append({"type": "send", "event": event, "params": send_params})
+
+					actions.append(SCXMLSendAction.new(event, send_params))
 				elif node_name == "assign":
 					var location := xml.get_named_attribute_value_safe("location")
-					var expr := _sanitize_assign_expression(xml.get_named_attribute_value_safe("expr"), params)
+					var expr := _sanitize_assign_expression(
+						xml.get_named_attribute_value_safe("expr"), params
+					)
 					if not location.is_empty():
-						actions.append({"type": "assign", "location": location, "expr": expr})
+						actions.append(SCXMLAssignAction.new(location, expr))
 						# Add assigned location to known params if not exists
 						var found := false
 						for p in params:
@@ -604,7 +680,9 @@ func _parse_executable_content(xml: XMLParser, element_name: String, params: Arr
 								found = true
 								break
 						if not found:
-							params.append({"name": location, "type": "variant", "expr": "null", "local": ""})
+							params.append(
+								{"name": location, "type": "variant", "expr": "null", "local": ""}
+							)
 				# Other elements could be added here later
 			XMLParser.NODE_ELEMENT_END:
 				if xml.get_node_name() == element_name:
