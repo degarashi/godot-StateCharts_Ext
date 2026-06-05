@@ -246,6 +246,12 @@ static var _entries_cache: Dictionary = {}
 		debug_event = value
 		_update_debug_event_connection()
 
+## Whether to highlight active states in the editor scene tree at runtime.
+@export var runtime_visualization := false:
+	set(value):
+		runtime_visualization = value
+		_update_debug_log_connections(self)
+
 ## Exception list for unused event warnings
 @export var exclude_unused_event: Array[StringName] = []:
 	set(value):
@@ -503,11 +509,19 @@ func _ready() -> void:
 
 
 func _on_state_entered(state: Node) -> void:
-	DLogger.debug("State entered (Post): {0}", [state.name], CAT, self)
+	if debug_log:
+		DLogger.debug("State entered (Post): {0}", [state.name], CAT, self)
+	if runtime_visualization:
+		state.set_meta("statechart_ext_original_name", state.name)
+		state.name = "▶ " + state.name
 
 
 func _on_state_exited(state: Node) -> void:
-	DLogger.debug("State exited (Post): {0}", [state.name], CAT, self)
+	if debug_log:
+		DLogger.debug("State exited (Post): {0}", [state.name], CAT, self)
+	if runtime_visualization:
+		if state.has_meta("statechart_ext_original_name"):
+			state.name = state.get_meta("statechart_ext_original_name")
 
 
 func _evaluate_and_assign(location: String, expr_str: String) -> void:
@@ -808,12 +822,18 @@ func _update_debug_log_connections(node: Node) -> void:
 		return
 	for child in node.get_children():
 		if child is StateChartState:
-			_update_state_signal(child, child.state_entered, _on_state_entered)
-			_update_state_signal(child, child.state_exited, _on_state_exited)
+			_update_state_signal_internal(
+				child, child.state_entered, _on_state_entered, debug_log or runtime_visualization
+			)
+			_update_state_signal_internal(
+				child, child.state_exited, _on_state_exited, debug_log or runtime_visualization
+			)
 		_update_debug_log_connections(child)
 
 
-func _update_state_signal(state: Node, sig: Signal, method: Callable) -> void:
+func _update_state_signal_internal(
+	state: Node, sig: Signal, method: Callable, enabled: bool
+) -> void:
 	var found_conn: Callable
 	for conn in sig.get_connections():
 		var c: Callable = conn["callable"]
@@ -821,12 +841,17 @@ func _update_state_signal(state: Node, sig: Signal, method: Callable) -> void:
 			found_conn = c
 			break
 
-	if debug_log:
+	if enabled:
 		if found_conn.is_null():
 			sig.connect(method.bind(state))
 	else:
 		if not found_conn.is_null():
 			sig.disconnect(found_conn)
+
+
+func _update_state_signal(state: Node, sig: Signal, method: Callable) -> void:
+	# Compatibility wrapper for existing calls if any
+	_update_state_signal_internal(state, sig, method, debug_log)
 
 
 func _update_debug_event_connection() -> void:
