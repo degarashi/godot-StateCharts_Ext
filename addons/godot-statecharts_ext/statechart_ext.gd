@@ -525,22 +525,18 @@ func _evaluate_and_assign(location: String, expr_str: String) -> void:
 		if not expr.has_execute_failed():
 			_set_expression_property_untyped(location, result)
 		else:
-			push_error(
-				(
-					"StateChartExt: Failed to execute assign expression: "
-					+ expr_str
-					+ " Error: "
-					+ expr.get_error_text()
-				)
+			DLogger.error(
+				"Failed to execute assign expression: {0} Error: {1}",
+				[expr_str, expr.get_error_text()],
+				CAT,
+				self
 			)
 	else:
-		push_error(
-			(
-				"StateChartExt: Failed to parse assign expression: "
-				+ expr_str
-				+ " Error: "
-				+ expr.get_error_text()
-			)
+		DLogger.error(
+			"Failed to parse assign expression: {0} Error: {1}",
+			[expr_str, expr.get_error_text()],
+			CAT,
+			self
 		)
 
 
