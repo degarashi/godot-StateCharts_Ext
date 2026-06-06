@@ -6,8 +6,8 @@ extends RefCounted
 # ------------- [Constants] -------------
 const EXT_NAMESPACE_PREFIX := "statechart_ext"
 const EXT_NAMESPACE_URI := "https://github.com/degarashi/godot-statecharts_ext/scxml"
-const NAME_ATTR_NAME := "%s:name" % EXT_NAMESPACE_PREFIX
-const GUARD_JSON_ATTR_NAME := "%s:guard_json" % EXT_NAMESPACE_PREFIX
+const NAME_ATTR_NAME := "statechart_ext:name"
+const GUARD_JSON_ATTR_NAME := "statechart_ext:guard_json"
 
 const QT_NAMESPACE_PREFIX := "qt"
 const QT_NAMESPACE_URI := "http://www.qt.io/2015/02/scxml-ext"
@@ -22,9 +22,8 @@ const AnyOfGuardScript := preload("res://addons/godot_state_charts/any_of_guard.
 
 const HistoryStateScript := preload("res://addons/godot_state_charts/history_state.gd")
 
-const UID_ATTR_NAME := "%s:uid" % EXT_NAMESPACE_PREFIX
+const UID_ATTR_NAME := "statechart_ext:uid"
 const UID_META_KEY := "statechart_ext__uid"
-
 
 # ------------- [Private Variable] -------------
 var _node_to_id: Dictionary[Node, String] = {}
@@ -125,7 +124,7 @@ func _export_datamodel(node: StateChartExt, lines: Array[String], indent: int) -
 		if val == null:
 			val_str = "null"
 		elif val is String or val is StringName:
-			val_str = "'%s'" % _escape_attr(String(val))
+			val_str = "'{0}'".format([_escape_attr(String(val))])
 		else:
 			val_str = _escape_attr(str(val))
 
@@ -146,7 +145,7 @@ func _export_local_datamodel(params: Array, lines: Array[String], indent: int) -
 		if val is StateChartExt.NoneValue:
 			val_str = "null"
 		elif val is String or val is StringName:
-			val_str = "'%s'" % _escape_attr(String(val))
+			val_str = "'{0}'".format([_escape_attr(String(val))])
 		else:
 			val_str = _escape_attr(str(val))
 		lines.append(
@@ -165,33 +164,36 @@ func _export_state(node: Node, lines: Array[String], indent: int) -> void:
 		var tag_name := _state_tag_name(node)
 		var state_attrs: Array[String] = []
 		var state_id := _node_to_id.get(node, node.name)
-		state_attrs.append('id="%s"' % _escape_attr(state_id))
+		state_attrs.append('id="{0}"'.format([_escape_attr(state_id)]))
 
 		# Initial state for compound states
 		if node is CompoundState:
 			var initial_node := node.get_node_or_null(node.initial_state)
 			if initial_node:
 				state_attrs.append(
-					'initial="%s"' % _escape_attr(_node_to_id.get(initial_node, initial_node.name))
+					'initial="{0}"'.format(
+						[_escape_attr(_node_to_id.get(initial_node, initial_node.name))]
+					)
 				)
 
 		if node is HistoryStateScript:
 			var h_state := node as HistoryState
 			# Only add type if not already in metadata as attr__type
 			if not node.has_meta("attr__type"):
-				state_attrs.append('type="%s"' % ("deep" if h_state.deep else "shallow"))
+				state_attrs.append('type="{0}"'.format(["deep" if h_state.deep else "shallow"]))
 
 		# Add UID to attributes
 		if _node_to_uid.has(node):
-			state_attrs.append('%s="%s"' % [UID_ATTR_NAME, _escape_attr(_node_to_uid[node])])
+			state_attrs.append(
+				'{0}="{1}"'.format([UID_ATTR_NAME, _escape_attr(_node_to_uid[node])])
+			)
 
 		var extra_tags: Array[String] = []
 		for meta_key in node.get_meta_list():
 			if meta_key.begins_with("attr__"):
 				state_attrs.append(
-					(
-						'%s="%s"'
-						% [
+					'{0}="{1}"'.format(
+						[
 							_desanitize_meta_key(meta_key.substr(6)),
 							_escape_attr(str(node.get_meta(meta_key)))
 						]
@@ -202,7 +204,7 @@ func _export_state(node: Node, lines: Array[String], indent: int) -> void:
 				var tag_full_name := _desanitize_meta_key(meta_key.substr(5))
 				var tag_attrs: Array[String] = []
 				for k in tag_info:
-					tag_attrs.append('%s="%s"' % [k, _escape_attr(str(tag_info[k]))])
+					tag_attrs.append('{0}="{1}"'.format([k, _escape_attr(str(tag_info[k]))]))
 				extra_tags.append(
 					"{s}\t<{tag} {attrs}/>".format(
 						{"s": spacing, "tag": tag_full_name, "attrs": " ".join(tag_attrs)}
@@ -213,9 +215,8 @@ func _export_state(node: Node, lines: Array[String], indent: int) -> void:
 			var default_node = node.get_node_or_null((node as HistoryState).default_state)
 			if default_node:
 				extra_tags.append(
-					(
-						'%s\t<transition target="%s"/>'
-						% [spacing, _escape_attr(_node_to_id.get(default_node, default_node.name))]
+					'{0}\t<transition target="{1}"/>'.format(
+						[spacing, _escape_attr(_node_to_id.get(default_node, default_node.name))]
 					)
 				)
 
@@ -242,25 +243,36 @@ func _export_state(node: Node, lines: Array[String], indent: int) -> void:
 								if send_params is Array and not send_params.is_empty():
 									lines.append(
 										'{s}\t\t<send event="{ev}">'.format(
-											{"s": spacing, "ev": _escape_attr(action.get("event", ""))}
+											{
+												"s": spacing,
+												"ev": _escape_attr(action.get("event", ""))
+											}
 										)
 									)
 									for p_data in send_params:
 										if p_data is Dictionary:
 											lines.append(
-												'{s}\t\t\t<param name="{name}" expr="{expr}"/>'.format(
-													{
-														"s": spacing,
-														"name": _escape_attr(p_data.get("name", "")),
-														"expr": _escape_attr(p_data.get("expr", ""))
-													}
+												(
+													'{s}\t\t\t<param name="{name}" expr="{expr}"/>'
+													. format(
+														{
+															"s": spacing,
+															"name":
+															_escape_attr(p_data.get("name", "")),
+															"expr":
+															_escape_attr(p_data.get("expr", ""))
+														}
+													)
 												)
 											)
 									lines.append("{s}\t\t</send>".format({"s": spacing}))
 								else:
 									lines.append(
 										'{s}\t\t<send event="{ev}"/>'.format(
-											{"s": spacing, "ev": _escape_attr(action.get("event", ""))}
+											{
+												"s": spacing,
+												"ev": _escape_attr(action.get("event", ""))
+											}
 										)
 									)
 							elif action.get("type") == "assign":
@@ -326,7 +338,7 @@ func _export_transitions(state_node: Node, lines: Array[String], indent: int) ->
 				var tag_full_name := _desanitize_meta_key(meta_key.substr(5))
 				var tag_attrs: Array[String] = []
 				for k in tag_info:
-					tag_attrs.append('%s="%s"' % [k, _escape_attr(str(tag_info[k]))])
+					tag_attrs.append('{0}="{1}"'.format([k, _escape_attr(str(tag_info[k]))]))
 				extra_tags.append(
 					"\t<{tag} {attrs}/>".format(
 						{"tag": tag_full_name, "attrs": " ".join(tag_attrs)}
@@ -375,25 +387,27 @@ func _export_transitions(state_node: Node, lines: Array[String], indent: int) ->
 					exported_events.append(e)
 
 		if not exported_events.is_empty():
-			attrs.append('event="%s"' % _escape_attr(" ".join(exported_events)))
+			attrs.append('event="{0}"'.format([_escape_attr(" ".join(exported_events))]))
 
 		if not key.target.is_empty():
-			attrs.append('target="%s"' % _escape_attr(key.target))
+			attrs.append('target="{0}"'.format([_escape_attr(key.target)]))
 
 		# If it's a combined transition, we don't really have a single Godot name.
 		# But we can try to restore the original name if there's only one.
 		if events.size() <= 1:
-			attrs.append('%s="%s"' % [NAME_ATTR_NAME, _escape_attr(group.original_name)])
+			attrs.append('{0}="{1}"'.format([NAME_ATTR_NAME, _escape_attr(group.original_name)]))
 
 		if not key.guard_cond.is_empty():
-			attrs.append('cond="%s"' % _escape_attr(key.guard_cond))
+			attrs.append('cond="{0}"'.format([_escape_attr(key.guard_cond)]))
 		if not key.guard_ast.is_empty():
 			attrs.append(
-				'%s="%s"' % [GUARD_JSON_ATTR_NAME, _escape_attr(JSON.stringify(key.guard_ast))]
+				'{0}="{1}"'.format(
+					[GUARD_JSON_ATTR_NAME, _escape_attr(JSON.stringify(key.guard_ast))]
+				)
 			)
 
 		for attr_name in key.attrs:
-			attrs.append('%s="%s"' % [attr_name, _escape_attr(key.attrs[attr_name])])
+			attrs.append('{0}="{1}"'.format([attr_name, _escape_attr(key.attrs[attr_name])]))
 
 		if key.extra_tags.is_empty():
 			lines.append(
@@ -430,19 +444,19 @@ func _guard_to_cond(guard: Guard, context_transition: Transition) -> String:
 	if guard is StateIsActiveGuardScript:
 		var target_node := context_transition.get_node_or_null(guard.state)
 		if target_node:
-			return "In('%s')" % _node_to_id.get(target_node, target_node.name)
-		return "In('%s')" % String(guard.state)
+			return "In('{0}')".format([_node_to_id.get(target_node, target_node.name)])
+		return "In('{0}')".format([String(guard.state)])
 	if guard is NotGuardScript:
 		var inner := _guard_to_cond(guard.guard, context_transition)
 		if inner.is_empty():
 			return ""
-		return "!(%s)" % inner
+		return "!({0})".format([inner])
 	if guard is AllOfGuardScript:
 		var parts: Array[String] = []
 		for g in guard.guards:
 			var s := _guard_to_cond(g, context_transition)
 			if not s.is_empty():
-				parts.append("(%s)" % s)
+				parts.append("({0})".format([s]))
 		if parts.is_empty():
 			return ""
 		return " && ".join(parts)
@@ -451,7 +465,7 @@ func _guard_to_cond(guard: Guard, context_transition: Transition) -> String:
 		for g in guard.guards:
 			var s := _guard_to_cond(g, context_transition)
 			if not s.is_empty():
-				parts.append("(%s)" % s)
+				parts.append("({0})".format([s]))
 		if parts.is_empty():
 			return ""
 		return " || ".join(parts)
@@ -552,7 +566,9 @@ func export_to_scxml(node: Node) -> String:
 
 			if parts.size() == 2:
 				root_attrs.append(
-					'%s="%s"' % [desanitized_key, _escape_attr(str(node.get_meta(meta_key)))]
+					'{0}="{1}"'.format(
+						[desanitized_key, _escape_attr(str(node.get_meta(meta_key)))]
+					)
 				)
 
 	var ns_parts: Array[String] = []
@@ -560,7 +576,7 @@ func export_to_scxml(node: Node) -> String:
 	var ns_keys := namespaces.keys()
 	ns_keys.sort()
 	for ns in ns_keys:
-		ns_parts.append('%s="%s"' % [ns, namespaces[ns]])
+		ns_parts.append('{0}="{1}"'.format([ns, namespaces[ns]]))
 
 	xml_lines.append(
 		'<scxml {ns} version="1.0" profile="ecmascript" {attrs}>'.format(

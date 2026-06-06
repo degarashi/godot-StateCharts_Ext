@@ -5,9 +5,9 @@ extends RefCounted
 
 # ------------- [Constants] -------------
 const EXT_NAMESPACE_PREFIX := "statechart_ext"
-const NAME_ATTR_NAME := "%s:name" % EXT_NAMESPACE_PREFIX
-const GUARD_JSON_ATTR_NAME := "%s:guard_json" % EXT_NAMESPACE_PREFIX
-const UID_ATTR_NAME := "%s:uid" % EXT_NAMESPACE_PREFIX
+const NAME_ATTR_NAME := "statechart_ext:name"
+const GUARD_JSON_ATTR_NAME := "statechart_ext:guard_json"
+const UID_ATTR_NAME := "statechart_ext:uid"
 const UID_META_KEY := "statechart_ext__uid"
 const SCXML_PATH_META_KEY := "statechart_ext__scxml_path"
 
@@ -144,20 +144,22 @@ static func generate_scdef(path: String) -> String:
 					state_stack.pop_back()
 
 	var lines: Array[String] = []
-	lines.append("class %s" % class_name_str)
+	lines.append("class {0}".format([class_name_str]))
 	lines.append("")
 	for ev in events:
-		lines.append("event %s" % ev)
+		lines.append("event {0}".format([ev]))
 	if not events.is_empty():
 		lines.append("")
 	for p in params:
 		var opt_str := ""
 		if not p["local"].is_empty():
-			opt_str = ' {local: "%s"}' % p["local"]
+			opt_str = ' {local: "{0}"}'.format([p["local"]])
 		if p["expr"].is_empty() or p["expr"] == "null":
-			lines.append("param %s %s%s" % [p["name"], p["type"], opt_str])
+			lines.append("param {0} {1}{2}".format([p["name"], p["type"], opt_str]))
 		else:
-			lines.append("param %s %s = %s%s" % [p["name"], p["type"], p["expr"], opt_str])
+			lines.append(
+				"param {0} {1} = {2}{3}".format([p["name"], p["type"], p["expr"], opt_str])
+			)
 
 	return "\n".join(lines)
 
@@ -182,7 +184,7 @@ static func _add_param_from_xml(
 	else:
 		# Default to string for unquoted identifiers/literals to avoid compile errors
 		type_str = "string"
-		val_str = '"%s"' % expr.replace('"', '\\"')
+		val_str = '"{0}"'.format([expr.replace('"', '\\"')])
 
 	var local_state := ""
 	if not state_stack.is_empty():
@@ -673,7 +675,7 @@ static func _sanitize_assign_expression(expr: String, params: Array[Dictionary])
 				break
 		if not is_param:
 			# Treat as a string literal and quote it
-			return '"%s"' % expr.replace('"', '\\"')
+			return '"{0}"'.format([expr.replace('"', '\\"')])
 
 	return expr
 
@@ -835,8 +837,13 @@ func _instantiate_state_tree(
 	_set_owner(state_node, parent.owner if parent.owner else parent)
 
 	if parsed.id in state_by_id:
-		push_warning(
-			"Duplicate SCXML state id '%s'. Transition resolution may be ambiguous." % parsed.id
+		DLogger.warn(
+			"Duplicate SCXML state id '{0}'. Transition resolution may be ambiguous.".format(
+				[parsed.id]
+			),
+			[],
+			"scxml_importer",
+			self
 		)
 	state_by_id[parsed.id] = state_node
 
@@ -948,10 +955,16 @@ func _assign_initial_state(
 						(parent as CompoundState).initial_state = parent.get_path_to(child)
 
 		if initial_target == null:
-			push_warning(
-				(
-					"Initial state '%s' was not found as a descendant of '%s'. Falling back to the first child."
-					% [parsed.initial_id, parsed.id]
+			(
+				DLogger
+				. warn(
+					(
+						"Initial state '{0}' was not found as a descendant of '{1}'. Falling back to the first child."
+						. format([parsed.initial_id, parsed.id])
+					),
+					[],
+					"scxml_importer",
+					self
 				)
 			)
 
@@ -968,8 +981,13 @@ func _resolve_pending_transitions(
 	for pending in pending_transitions:
 		var target_state := state_by_id.get(pending.target_id) as StateChartState
 		if not pending.target_id.is_empty() and target_state == null:
-			push_warning(
-				"Transition target '%s' was not found in imported SCXML." % pending.target_id
+			DLogger.warn(
+				"Transition target '{0}' was not found in imported SCXML.".format(
+					[pending.target_id]
+				),
+				[],
+				"scxml_importer",
+				self
 			)
 			continue
 
@@ -1022,8 +1040,13 @@ func _guard_from_ast(
 			)
 			return guard
 
-	push_warning(
-		"Unsupported SCXML guard type '%s'. Guard was ignored." % String(ast.get("type", ""))
+	DLogger.warn(
+		"Unsupported SCXML guard type '{0}'. Guard was ignored.".format(
+			[String(ast.get("type", ""))]
+		),
+		[],
+		"scxml_importer",
+		self
 	)
 	return null
 

@@ -80,11 +80,13 @@ const GD_TYPE_MAP: Dictionary[String, String] = {
 
 # ------------- [Private Static Method] -------------
 ## Generates GDScript source code from given data
-static func _generate_script(class_name_str: String, events: Array, params: Array) -> String:
+static func _generate_script(
+	class_name_str: String, events: Array[Dictionary], params: Array[Dictionary]
+) -> String:
 	var lines: Array[String] = []
 	lines.append("# [StateChartExt] Generated boilerplate. Do not edit manually.")
 	lines.append("@tool")
-	lines.append("class_name %s extends StateChartExt" % class_name_str)
+	lines.append("class_name {0} extends StateChartExt".format([class_name_str]))
 	lines.append("")
 
 	# --- Proxy Variables (for IDE completion) ---
@@ -100,8 +102,8 @@ static func _generate_script(class_name_str: String, events: Array, params: Arra
 	else:
 		for ev in events:
 			if not ev.comment.is_empty():
-				lines.append("\t## %s" % ev.comment)
-			lines.append("\tstatic var %s := e()" % ev.name)
+				lines.append("\t## {0}".format([ev.comment]))
+			lines.append("\tstatic var {0} := e()".format([ev.name]))
 	lines.append("")
 
 	# --- Param class ---
@@ -112,7 +114,7 @@ static func _generate_script(class_name_str: String, events: Array, params: Arra
 	else:
 		for p_data in params:
 			if not p_data.comment.is_empty():
-				lines.append("\t## %s" % p_data.comment)
+				lines.append("\t## {0}".format([p_data.comment]))
 			var type_str: String = TYPE_MAP.get(p_data.type, "TYPE_NIL")
 
 			var notify_map_code := "{}"
@@ -121,9 +123,9 @@ static func _generate_script(class_name_str: String, events: Array, params: Arra
 				for ev_name in p_data.notify:
 					var val = p_data.notify[ev_name]
 					notify_parts.append(
-						"%s.Event.%s: %s" % [class_name_str, ev_name, str(val).to_lower()]
+						"{0}.Event.{1}: {2}".format([class_name_str, ev_name, str(val).to_lower()])
 					)
-				notify_map_code = "{%s}" % ", ".join(notify_parts)
+				notify_map_code = "{ {0} }".format([", ".join(notify_parts)])
 
 			var init_val_code := "StateChartExt._s_none_value"
 			if not p_data.init.is_empty():
@@ -131,12 +133,11 @@ static func _generate_script(class_name_str: String, events: Array, params: Arra
 
 			var local_state_code := '&""'
 			if not p_data.local_state.is_empty():
-				local_state_code = '&"%s"' % p_data.local_state
+				local_state_code = '&"{0}"'.format([p_data.local_state])
 
 			lines.append(
-				(
-					"\tstatic var %s := p(%s, %s, %s, %s)"
-					% [p_data.name, type_str, notify_map_code, init_val_code, local_state_code]
+				"\tstatic var {0} := p({1}, {2}, {3}, {4})".format(
+					[p_data.name, type_str, notify_map_code, init_val_code, local_state_code]
 				)
 			)
 	lines.append("")
@@ -146,17 +147,18 @@ static func _generate_script(class_name_str: String, events: Array, params: Arra
 
 	var event_names: Array[String] = []
 	for ev in events:
-		event_names.append('"%s"' % ev.name)
-	lines.append("\tfunc has(name: String) -> bool: return name in [%s]" % ", ".join(event_names))
+		event_names.append('"{0}"'.format([ev.name]))
+	lines.append(
+		"\tfunc has(name: String) -> bool: return name in [{0}]".format([", ".join(event_names)])
+	)
 
 	if events.is_empty():
 		pass
 	else:
 		for ev in events:
 			lines.append(
-				(
-					"\tfunc %s() -> void: _sc.send_event_ext(%s.Event.%s)"
-					% [ev.name, class_name_str, ev.name]
+				"\tfunc {0}() -> void: _sc.send_event_ext({1}.Event.{2})".format(
+					[ev.name, class_name_str, ev.name]
 				)
 			)
 	lines.append("")
@@ -165,10 +167,10 @@ static func _generate_script(class_name_str: String, events: Array, params: Arra
 
 	var param_names: Array[String] = []
 	for p_data in params:
-		param_names.append('"%s"' % p_data.name)
+		param_names.append('"{0}"'.format([p_data.name]))
 
 	lines.append("\tfunc has(name: String) -> bool:")
-	lines.append("\t\tif not name in [%s]: return false" % ", ".join(param_names))
+	lines.append("\t\tif not name in [{0}]: return false".format([", ".join(param_names)]))
 	lines.append("\t\treturn _sc._expression_properties.has(name)")
 	lines.append("")
 
@@ -177,22 +179,20 @@ static func _generate_script(class_name_str: String, events: Array, params: Arra
 	else:
 		for p_data in params:
 			var gd_type := GD_TYPE_MAP.get(p_data.type, "Variant")
-			lines.append("\tvar %s: %s:" % [p_data.name, gd_type])
+			lines.append("\tvar {0}: {1}:".format([p_data.name, gd_type]))
 
 			var default_val_code := "null"
 			if p_data.type in GD_TYPE_MAP:
-				default_val_code = "_sc._make_zero(%s)" % TYPE_MAP[p_data.type]
+				default_val_code = "_sc._make_zero({0})".format([TYPE_MAP[p_data.type]])
 
 			lines.append(
-				(
-					"\t\tget: return _sc.get_expression_property_ext(%s.Param.%s, %s)"
-					% [class_name_str, p_data.name, default_val_code]
+				"\t\tget: return _sc.get_expression_property_ext({0}.Param.{1}, {2})".format(
+					[class_name_str, p_data.name, default_val_code]
 				)
 			)
 			lines.append(
-				(
-					"\t\tset(v): _sc.set_expression_property_ext(%s.Param.%s, v)"
-					% [class_name_str, p_data.name]
+				"\t\tset(v): _sc.set_expression_property_ext({0}.Param.{1}, v)".format(
+					[class_name_str, p_data.name]
 				)
 			)
 	lines.append("")
@@ -246,7 +246,7 @@ static func parse_scdef(text: String, fallback_name: String = "GeneratedStateCha
 
 		var parts := line_content.split(" ", false)
 		if parts.size() < 2:
-			error_msg = "Line %d: Invalid syntax. Expected 'command name'." % (i + 1)
+			error_msg = "Line {0}: Invalid syntax. Expected 'command name'.".format([i + 1])
 			break
 
 		var cmd := parts[0].to_lower()
@@ -257,8 +257,8 @@ static func parse_scdef(text: String, fallback_name: String = "GeneratedStateCha
 		if cmd != "class":
 			if used_names.has(name):
 				error_msg = (
-					"Line %d: Duplicate name '%s' (previously defined at line %d)."
-					% [i + 1, name, used_names[name]]
+					"Line {0}: Duplicate name '{1}' (previously defined at line {2})."
+					. format([i + 1, name, used_names[name]])
 				)
 				break
 			used_names[name] = i + 1
@@ -320,7 +320,9 @@ static func parse_scdef(text: String, fallback_name: String = "GeneratedStateCha
 						else:
 							p_notify[k] = v_str.to_lower() == "true"
 					else:
-						error_msg = "Line %d: Invalid notification/option map syntax." % (i + 1)
+						error_msg = "Line {0}: Invalid notification/option map syntax.".format(
+							[i + 1]
+						)
 						break
 
 			if not error_msg.is_empty():
@@ -339,7 +341,7 @@ static func parse_scdef(text: String, fallback_name: String = "GeneratedStateCha
 				p_type = p_parts[2].to_lower()
 
 			if not p_type in TYPE_MAP:
-				error_msg = "Line %d: Unknown type '%s'." % [i + 1, p_type]
+				error_msg = "Line {0}: Unknown type '{1}'.".format([i + 1, p_type])
 				break
 
 			params.append(
@@ -353,10 +355,11 @@ static func parse_scdef(text: String, fallback_name: String = "GeneratedStateCha
 				}
 			)
 		else:
-			error_msg = "Line %d: Unknown command '%s'." % [i + 1, cmd]
+			error_msg = "Line {0}: Unknown command '{1}'.".format([i + 1, cmd])
 			break
 
 	if not error_msg.is_empty():
+		DLogger.error("scdef parse error: {0}".format([error_msg]))
 		return {"error": error_msg}
 
 	return {"class_name": class_name_str, "events": events, "params": params, "error": ""}
@@ -370,4 +373,5 @@ static func parse_and_generate(
 	if not result.error.is_empty():
 		return {"code": "", "error": result.error}
 
+	DLogger.info("Generated StateChart code for {0}".format([result.class_name]))
 	return {"code": _generate_script(result.class_name, result.events, result.params), "error": ""}

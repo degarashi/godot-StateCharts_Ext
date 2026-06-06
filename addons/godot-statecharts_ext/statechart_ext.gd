@@ -310,9 +310,9 @@ func _get_property_list() -> Array[Dictionary]:
 				usage |= PROPERTY_USAGE_NIL_IS_VARIANT
 			var display_name := p_name
 			if not ent.local_state.is_empty():
-				display_name = (
-					"%s%s%s %s" % [LOCAL_PARAM_PREFIX, ent.local_state, LOCAL_PARAM_SUFFIX, p_name]
-				)
+				display_name = ("{0}{1}{2} {3}".format(
+					[LOCAL_PARAM_PREFIX, ent.local_state, LOCAL_PARAM_SUFFIX, p_name]
+				))
 
 			properties.append(
 				{"name": PROP_GROUP_PARAM + display_name, "type": ent.type_id, "usage": usage}
