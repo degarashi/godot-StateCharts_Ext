@@ -1,0 +1,14 @@
+[remap]
+
+importer="statechart_ext_scdef"
+type="Resource"
+uid="uid://pm45l8wfvgxo"
+path="res://.godot/imported/test_player_sc.scdef-fbee6242ccbef1840fef5225cb0282cb.res"
+
+[deps]
+
+source_file="res://tests/define/test_player_sc.scdef"
+dest_files=["res://.godot/imported/test_player_sc.scdef-fbee6242ccbef1840fef5225cb0282cb.res"]
+
+[params]
+

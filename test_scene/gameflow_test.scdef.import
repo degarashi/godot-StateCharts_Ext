@@ -1,0 +1,14 @@
+[remap]
+
+importer="statechart_ext_scdef"
+type="Resource"
+uid="uid://b3fgtq6wvom1p"
+path="res://.godot/imported/gameflow_test.scdef-f30912a4d58f032af7218bed78ab9898.res"
+
+[deps]
+
+source_file="res://test_scene/gameflow_test.scdef"
+dest_files=["res://.godot/imported/gameflow_test.scdef-f30912a4d58f032af7218bed78ab9898.res"]
+
+[params]
+

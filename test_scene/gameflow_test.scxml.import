@@ -1,0 +1,14 @@
+[remap]
+
+importer="statechart_ext_scxml"
+type="Resource"
+uid="uid://qxd4nmdns5we"
+path="res://.godot/imported/gameflow_test.scxml-4c8df42187d1dd9e6efa956b1cdc1759.res"
+
+[deps]
+
+source_file="res://test_scene/gameflow_test.scxml"
+dest_files=["res://.godot/imported/gameflow_test.scxml-4c8df42187d1dd9e6efa956b1cdc1759.res"]
+
+[params]
+

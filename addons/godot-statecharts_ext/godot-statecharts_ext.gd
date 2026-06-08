@@ -13,8 +13,12 @@ const MENU_EXPORT_SCXML := "StateChartExt: Export current StateChart as SCXML"
 const MENU_IMPORT_SCXML := "StateChartExt: Import SCXML to current StateChart"
 const MENU_CONVERT_SCXML := "StateChartExt: Convert SCXML to ." + StateChartExt.SCDEF_EXTENSION
 
-const FileSystemContextMenuScript := preload("res://addons/godot-statecharts_ext/editor/context_menu_filesystem.gd")
-const SceneTreeContextMenuScript := preload("res://addons/godot-statecharts_ext/editor/context_menu_scene_tree.gd")
+const FileSystemContextMenuScript := preload(
+	"res://addons/godot-statecharts_ext/editor/context_menu_filesystem.gd"
+)
+const SceneTreeContextMenuScript := preload(
+	"res://addons/godot-statecharts_ext/editor/context_menu_scene_tree.gd"
+)
 
 # ------------- [Private Variables] -------------
 var _fs_reloading := false
@@ -35,13 +39,16 @@ func _enter_tree() -> void:
 
 	var DummyImportPlugin := preload("uid://b70108gychlte")
 	_import_plugin = DummyImportPlugin.new(
-		"statechart_ext." + StateChartExt.SCDEF_EXTENSION,
+		"statechart_ext_scdef",
 		"StateChart Definition",
-		[StateChartExt.SCDEF_EXTENSION]
+		[StateChartExt.SCDEF_EXTENSION],
+		"StateChartDefinition"
 	)
 	add_import_plugin(_import_plugin)
 
-	_scxml_import_plugin = DummyImportPlugin.new("statechart_ext.scxml", "SCXML File", ["scxml"])
+	_scxml_import_plugin = DummyImportPlugin.new(
+		"statechart_ext_scxml", "SCXML File", ["scxml"], "StateChartSCXML"
+	)
 	add_import_plugin(_scxml_import_plugin)
 
 	# Wait for the editor to be fully ready before registration
