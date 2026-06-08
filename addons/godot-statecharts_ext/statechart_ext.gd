@@ -697,31 +697,7 @@ func _on_event_received(event: StringName) -> void:
 
 
 func _get_configuration_warnings() -> PackedStringArray:
-	var warnings: PackedStringArray = []
-	var sc_info := get_sc_info()
-	var params_m := gather_params_id(sc_info.param)
-	if not params_m.is_empty():
-		_check_param(warnings, params_m)
-
-	var event := _init_and_get_entries(sc_info.event, EventEnt)
-	var invalid_ev: PackedStringArray = []
-	var exclude_ev: PackedStringArray = []
-
-	exclude_ev.append_array(exclude_unused_event)
-	exclude_ev.append_array(exclude_warn_unknown_events)
-
-	for ev_name in exclude_ev:
-		if ev_name not in event:
-			invalid_ev.append(ev_name)
-
-	if not invalid_ev.is_empty():
-		var err_str := "invalid event name (exclude):\n"
-		err_str += ", ".join(invalid_ev)
-		warnings.append(err_str)
-	if not event.is_empty():
-		_check_event_typo(warnings, event, exclude_ev)
-		_check_unused_events(warnings, event, exclude_ev)
-
+	var warnings := StateChartValidator.get_warnings(self)
 	warnings.append_array(super())
 	return warnings
 
@@ -774,6 +750,10 @@ static func _init_and_get_entries(
 
 	_entries_cache[source][target_type_name] = ret
 	return ret
+
+
+static func init_and_get_entries(source: Script, entry_target: Script) -> Dictionary[String, EntBase]:
+	return _init_and_get_entries(source, entry_target)
 
 
 static func gather_params_id(source: Script) -> Dictionary[String, int]:
@@ -913,117 +893,6 @@ func _update_debug_event_connection() -> void:
 	else:
 		if is_con:
 			event_received.disconnect(_on_event_received)
-
-
-func _check_unused_events(
-	warnings: PackedStringArray, event: Dictionary[String, EntBase], exclude_ev: PackedStringArray
-) -> void:
-	var using_event := _collect_using_event()
-	var unused_event := event.keys()
-	for ev_name in using_event:
-		unused_event.erase(ev_name)
-	for ev_name in exclude_ev:
-		unused_event.erase(ev_name)
-	if unused_event.size() > 0:
-		warnings.append("unused event(s):\n" + ", ".join(unused_event))
-
-
-func _collect_using_event() -> PackedStringArray:
-	var using_set: Dictionary[String, bool] = {}
-	_collect_using_event_internal(using_set, self)
-	var using_ev_str: PackedStringArray = []
-	for event_name in using_set:
-		using_ev_str.append(event_name)
-	return using_ev_str
-
-
-func _collect_using_event_internal(dst: Dictionary[String, bool], node: Node) -> void:
-	for c in node.get_children():
-		if c is Transition and not c.event.is_empty():
-			dst[c.event] = true
-		else:
-			_collect_using_event_internal(dst, c)
-
-
-func _check_param(dst: PackedStringArray, param_def: Dictionary[String, int]) -> void:
-	_check_param_internal(dst, self, "", param_def)
-
-
-func _check_param_internal(
-	dst: PackedStringArray, node: Node, path: String, param_def: Dictionary[String, int]
-) -> void:
-	for c in node.get_children():
-		var child_path := path + PATH_SEPARATOR + c.name
-		if c is Transition:
-			var g_a := _find_expression_guard(dst, child_path, c.guard)
-			for g in g_a:
-				_check_expression(dst, child_path, g.expression, param_def)
-		else:
-			_check_param_internal(dst, c, child_path, param_def)
-
-
-func _check_expression(
-	dst: PackedStringArray, path: String, exp_str: String, param_def: Dictionary[String, int]
-) -> void:
-	var params: PackedStringArray = []
-	for k in param_def.keys():
-		params.append(k)
-
-	var expr := Expression.new()
-	if expr.parse(exp_str, params) != OK:
-		dst.append("Expression parse error: {1}\n at [{0}]".format([path, expr.get_error_text()]))
-		return
-
-	var inputs: Array = []
-	for k in param_def.keys():
-		inputs.append(_make_zero(param_def[k]))
-
-	expr.execute(inputs, self)
-	if expr.has_execute_failed():
-		dst.append(
-			"Expression execution error: {1}\n at [{0}]".format([path, expr.get_error_text()])
-		)
-
-
-func _check_event_typo(
-	err_msg: PackedStringArray, events: Dictionary[String, EntBase], exclude_ev: PackedStringArray
-) -> void:
-	_check_event_typo_internal(err_msg, self, "", events, exclude_ev)
-
-
-func _check_event_typo_internal(
-	err_msg: PackedStringArray,
-	node: Node,
-	path: String,
-	events: Dictionary[String, EntBase],
-	exclude_ev: PackedStringArray
-) -> void:
-	for c in node.get_children():
-		var child_path := path + PATH_SEPARATOR + c.name
-		if c is Transition:
-			if not c.event.is_empty() and c.event not in events and c.event not in exclude_ev:
-				err_msg.append("Unknown event: {1}\n at [{0}]".format([child_path, c.event]))
-		else:
-			_check_event_typo_internal(err_msg, c, child_path, events, exclude_ev)
-
-
-func _find_expression_guard(
-	warnings: PackedStringArray, path: String, g: Guard
-) -> Array[ExpressionGuard]:
-	if g is ExpressionGuard:
-		return [g]
-	if g is NotGuard:
-		return _find_expression_guard(warnings, path, g.guard)
-	if g is AllOfGuard or g is AnyOfGuard:
-		if g.guards.is_empty():
-			warnings.append("no guards inside\nat:{0}".format([path]))
-		else:
-			var ret: Array[ExpressionGuard] = []
-			for gc in g.guards:
-				ret.append_array(_find_expression_guard(warnings, path, gc))
-			return ret
-	return []
-
 
 func _update_exclusion_list(list: Array[StringName], ev_name: StringName, enabled: bool) -> void:
 	if enabled:
