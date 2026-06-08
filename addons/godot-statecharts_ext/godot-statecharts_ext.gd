@@ -35,7 +35,7 @@ var _fs_icon_manager: RefCounted  # (FileSystemIconManager)
 
 # ------------- [Lifecycle Methods] -------------
 func _enter_tree() -> void:
-	DLogger.info("Plugin enabled.", [], CAT)
+	DLogger.debug("Plugin enabled.", [], CAT)
 
 	_editor_manager = StateChartEditorManager.new(self)
 	_init_settings()
@@ -138,7 +138,7 @@ func _handles(object: Object) -> bool:
 
 func _edit(object: Object) -> void:
 	if object is Resource:
-		DLogger.info("Editing resource via _edit: {0}", [object.resource_path], CAT)
+		DLogger.debug("Editing resource via _edit: {0}", [object.resource_path], CAT)
 		_open_in_external_editor(object.resource_path)
 
 
@@ -181,24 +181,49 @@ func _open_in_external_editor(path: String) -> void:
 	var global_path := ProjectSettings.globalize_path(path)
 	var es := EditorInterface.get_editor_settings()
 
-	var editor_path: String = es.get_setting("state_charts_ext/scxml_editor_path")
+	var editor_path := ""
+	var args: PackedStringArray = []
 
-	if not editor_path.is_empty():
-		DLogger.info("Attempting to open {0} with custom editor: {1}", [global_path, editor_path], CAT)
-		var pid := OS.create_process(editor_path, [global_path])
-		if pid == -1:
-			DLogger.error(
-				"Failed to start process: {0}. Check if the path is correct and executable.",
-				[editor_path],
-				CAT
-			)
-		else:
-			DLogger.info("Process started with PID: {0}", [pid], CAT)
+	if path.ends_with(".scxml"):
+		editor_path = es.get_setting("state_charts_ext/scxml_editor_path")
+		if editor_path.is_empty():
+			DLogger.debug("Opening SCXML {0} with system default.", [global_path], CAT)
+			OS.shell_open(global_path)
 			return
+		args = [global_path]
+	else:
+		# For .scdef, prioritize Godot's standard external editor settings
+		editor_path = es.get_setting("text_editor/external/exec_path")
+		var flags: String = es.get_setting("text_editor/external/exec_flags")
 
-	# Fallback to system default
-	DLogger.info("Opening {0} with system default.", [global_path], CAT)
-	OS.shell_open(global_path)
+		if not editor_path.is_empty():
+			# Apply execution flags
+			var flag_str := flags.replace("{file}", global_path).replace("{line}", "1").replace(
+				"{col}", "1"
+			)
+			args = flag_str.split(" ", false)
+		else:
+			# Fallback to OpenNvim or nvim if standard setting is empty
+			if es.has_setting("OpenNvim/neovim_executable"):
+				editor_path = es.get_setting("OpenNvim/neovim_executable")
+			else:
+				editor_path = "nvim"
+			args = [global_path]
+
+	DLogger.debug(
+		"Attempting to open {0} with editor: {1} (args: {2})",
+		[global_path, editor_path, args],
+		CAT
+	)
+	var pid := OS.create_process(editor_path, args)
+	if pid == -1:
+		DLogger.warn(
+			"Failed to start process: {0}. Check if the path is correct and executable.",
+			[editor_path],
+			CAT
+		)
+	else:
+		DLogger.debug("Process started with PID: {0}", [pid], CAT)
 
 
 func _on_export_scxml_requested() -> void:
@@ -250,4 +275,4 @@ func _register_inspectors_delayed() -> void:
 	_dummy_resource_inspector_plugin = DummyResourceInspectorPlugin.new(self)
 	add_inspector_plugin(_dummy_resource_inspector_plugin)
 
-	DLogger.info("Inspector Plugins registered safely.", [], CAT)
+	DLogger.debug("Inspector Plugins registered safely.", [], CAT)
