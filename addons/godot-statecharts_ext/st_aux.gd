@@ -71,3 +71,37 @@ static func bind_signals_to_events(
 ## Sends an event to the StateChart (for binding to signals).
 static func dispatch_event(st: StateChartExt, ev: StateChartExt.EventEnt) -> void:
 	st.send_event_ext(ev)
+
+
+## Splits a command-line string into arguments, respecting quotes and escaped characters.
+static func split_args(flags: String) -> PackedStringArray:
+	var result: PackedStringArray = []
+	var current := ""
+	var quote_char := ""  # Empty, ' or "
+	var escaped := false
+
+	for i in range(flags.length()):
+		var c := flags[i]
+		if escaped:
+			current += c
+			escaped = false
+		elif c == "\\":
+			escaped = true
+		elif quote_char != "":
+			if c == quote_char:
+				quote_char = ""
+			else:
+				current += c
+		elif c == "\"" or c == "'":
+			quote_char = c
+		elif c == " ":
+			if not current.is_empty():
+				result.append(current)
+				current = ""
+		else:
+			current += c
+
+	if not current.is_empty():
+		result.append(current)
+
+	return result

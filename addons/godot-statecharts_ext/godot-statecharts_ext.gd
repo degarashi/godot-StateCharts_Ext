@@ -201,7 +201,7 @@ func _open_in_external_editor(path: String) -> void:
 			var flag_str := flags.replace("{file}", global_path).replace("{line}", "1").replace(
 				"{col}", "1"
 			)
-			args = flag_str.split(" ", false)
+			args = STAux.split_args(flag_str)
 		else:
 			# Fallback to OpenNvim or nvim if standard setting is empty
 			if es.has_setting("OpenNvim/neovim_executable"):
