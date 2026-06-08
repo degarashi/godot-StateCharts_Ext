@@ -26,9 +26,11 @@ var _import_plugin: EditorImportPlugin
 var _scxml_import_plugin: EditorImportPlugin
 var _transition_inspector_plugin: EditorInspectorPlugin
 var _statechart_ext_inspector_plugin: EditorInspectorPlugin
+var _dummy_resource_inspector_plugin: EditorInspectorPlugin
 var _context_menu_plugin: EditorContextMenuPlugin
 var _scene_tree_context_menu_plugin: EditorContextMenuPlugin
 var _editor_manager: StateChartEditorManager
+var _fs_icon_manager: RefCounted  # (FileSystemIconManager)
 
 
 # ------------- [Lifecycle Methods] -------------
@@ -36,6 +38,11 @@ func _enter_tree() -> void:
 	DLogger.info("Plugin enabled.", [], CAT)
 
 	_editor_manager = StateChartEditorManager.new(self)
+
+	var FSIconManager := preload(
+		"res://addons/godot-statecharts_ext/editor/file_system_icon_manager.gd"
+	)
+	_fs_icon_manager = FSIconManager.new(self)
 
 	var DummyImportPlugin := preload("uid://b70108gychlte")
 	_import_plugin = DummyImportPlugin.new(
@@ -78,6 +85,10 @@ func _enter_tree() -> void:
 
 
 func _exit_tree() -> void:
+	if _fs_icon_manager:
+		_fs_icon_manager.cleanup()
+		_fs_icon_manager = null
+
 	if _import_plugin:
 		remove_import_plugin(_import_plugin)
 		_import_plugin = null
@@ -93,6 +104,10 @@ func _exit_tree() -> void:
 	if _statechart_ext_inspector_plugin:
 		remove_inspector_plugin(_statechart_ext_inspector_plugin)
 		_statechart_ext_inspector_plugin = null
+
+	if _dummy_resource_inspector_plugin:
+		remove_inspector_plugin(_dummy_resource_inspector_plugin)
+		_dummy_resource_inspector_plugin = null
 
 	if _context_menu_plugin:
 		remove_context_menu_plugin(_context_menu_plugin)
@@ -116,6 +131,16 @@ func _exit_tree() -> void:
 	_editor_manager = null
 
 
+func _handles(object: Object) -> bool:
+	return object is StateChartDefinition or object is StateChartSCXML
+
+
+func _edit(object: Object) -> void:
+	if object is Resource:
+		DLogger.info("Editing resource via _edit: {0}", [object.resource_path], CAT)
+		_open_in_external_editor(object.resource_path)
+
+
 # ------------- [Callbacks] -------------
 func _on_filesystem_changed() -> void:
 	if _fs_reloading:
@@ -134,6 +159,40 @@ func _on_sources_changed(_exist: bool) -> void:
 # ------------- [Private Methods] -------------
 func _on_manual_scan_requested() -> void:
 	_editor_manager.manual_scan()
+
+
+func _open_in_external_editor(path: String) -> void:
+	var global_path := ProjectSettings.globalize_path(path)
+	var es := EditorInterface.get_editor_settings()
+
+	# 1. Try OpenNvim plugin setting if it exists
+	var nvim_path := ""
+	if es.has_setting("OpenNvim/neovim_executable"):
+		nvim_path = es.get_setting("OpenNvim/neovim_executable")
+		DLogger.info("Found OpenNvim setting: {0}", [nvim_path], CAT)
+
+	# 2. Try standard external editor setting
+	if nvim_path.is_empty():
+		if es.get_setting("text_editor/external/use_external_editor"):
+			nvim_path = es.get_setting("text_editor/external/exec_path")
+			DLogger.info("Found standard external editor setting: {0}", [nvim_path], CAT)
+
+	# 3. Fallback to just "nvim"
+	if nvim_path.is_empty():
+		nvim_path = "nvim"
+		DLogger.info("No setting found, falling back to: {0}", [nvim_path], CAT)
+
+	DLogger.info("Attempting to open {0} with {1}", [global_path, nvim_path], CAT)
+
+	var pid := OS.create_process(nvim_path, [global_path])
+	if pid == -1:
+		DLogger.error(
+			"Failed to start process: {0}. Check if the path is correct and executable.",
+			[nvim_path],
+			CAT
+		)
+	else:
+		DLogger.info("Process started with PID: {0}", [pid], CAT)
 
 
 func _on_export_scxml_requested() -> void:
@@ -169,10 +228,20 @@ func _register_inspectors_delayed() -> void:
 		remove_inspector_plugin(_statechart_ext_inspector_plugin)
 		_statechart_ext_inspector_plugin = null
 
+	if _dummy_resource_inspector_plugin:
+		remove_inspector_plugin(_dummy_resource_inspector_plugin)
+		_dummy_resource_inspector_plugin = null
+
 	_transition_inspector_plugin = preload("uid://c2pho7wt7vtg4").new()
 	add_inspector_plugin(_transition_inspector_plugin)
 
 	_statechart_ext_inspector_plugin = preload("uid://b3tq0e06y60t3").new(self)
 	add_inspector_plugin(_statechart_ext_inspector_plugin)
+
+	var DummyResourceInspectorPlugin := preload(
+		"res://addons/godot-statecharts_ext/inspector/dummy_resource_inspector_plugin.gd"
+	)
+	_dummy_resource_inspector_plugin = DummyResourceInspectorPlugin.new(self)
+	add_inspector_plugin(_dummy_resource_inspector_plugin)
 
 	DLogger.info("Inspector Plugins registered safely.", [], CAT)

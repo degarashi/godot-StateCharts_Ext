@@ -40,7 +40,7 @@ func _get_save_extension() -> String:
 
 
 func _get_resource_type() -> String:
-	return _resource_type
+	return "Resource"
 
 
 func _get_preset_count() -> int:
@@ -62,10 +62,8 @@ func _import(
 	_platform_variants: Array[String],
 	_gen_files: Array[String]
 ) -> Error:
-	var res: Resource
-	if _resource_type == "Resource":
-		res = Resource.new()
-	else:
+	var res := Resource.new()
+	if _resource_type != "Resource":
 		# Try to find the class in the global class list (GDScript class_name)
 		var script_path := ""
 		for gd_class in ProjectSettings.get_global_class_list():
@@ -74,13 +72,10 @@ func _import(
 				break
 
 		if not script_path.is_empty():
-			res = load(script_path).new()
-		else:
-			# Fallback to generic Resource or ClassDB if it's a built-in type
-			if ClassDB.can_instantiate(_resource_type):
-				res = ClassDB.instantiate(_resource_type)
-			else:
-				res = Resource.new()
+			res.set_script(load(script_path))
+		elif ClassDB.can_instantiate(_resource_type):
+			# If it's a built-in type, we can't just set_script, so we replace res
+			res = ClassDB.instantiate(_resource_type)
 
 	if res.get_script() and "source_code" in res:
 		res.source_code = FileAccess.get_file_as_string(source_file)
