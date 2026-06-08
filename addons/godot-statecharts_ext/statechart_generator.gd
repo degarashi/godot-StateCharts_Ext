@@ -373,5 +373,4 @@ static func parse_and_generate(
 	if not result.error.is_empty():
 		return {"code": "", "error": result.error}
 
-	DLogger.info("Generated StateChart code for {0}".format([result.class_name]))
 	return {"code": _generate_script(result.class_name, result.events, result.params), "error": ""}

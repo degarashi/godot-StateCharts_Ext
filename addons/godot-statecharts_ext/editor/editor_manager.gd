@@ -8,6 +8,8 @@ const CAT = "ScExt_Editor"
 var _plugin: EditorPlugin
 var _scxml_export_dialog: EditorFileDialog
 var _scxml_import_dialog: EditorFileDialog
+## Cache for .scdef file content hashes to avoid redundant processing [path] -> md5
+var _scdef_hash_cache: Dictionary = {}
 
 
 func _init(plugin: EditorPlugin) -> void:
@@ -16,6 +18,7 @@ func _init(plugin: EditorPlugin) -> void:
 
 func manual_scan() -> void:
 	DLogger.info("Manual scan started...", [], CAT)
+	_scdef_hash_cache.clear()
 	EditorInterface.get_resource_filesystem().scan()
 	scan_dir_recursive("res://")
 	DLogger.info("Manual scan finished.", [], CAT)
@@ -77,6 +80,12 @@ func process_scdef_file(scdef_path: String) -> void:
 	var content := f_scdef.get_as_text()
 	f_scdef.close()
 
+	# Skip if content hash hasn't changed
+	var content_hash := content.md5_text()
+	if _scdef_hash_cache.get(scdef_path) == content_hash:
+		return
+	_scdef_hash_cache[scdef_path] = content_hash
+
 	var old_content := ""
 	if FileAccess.file_exists(gd_path):
 		var f_gd := FileAccess.open(gd_path, FileAccess.READ)
@@ -96,7 +105,7 @@ func process_scdef_file(scdef_path: String) -> void:
 		if f_out:
 			f_out.store_string(result.code)
 			f_out.close()
-			DLogger.info("Generated: {0}", [gd_path], CAT)
+			DLogger.info("Generated StateChart code for {0}", [fallback_name], CAT)
 			EditorInterface.get_resource_filesystem().update_file(gd_path)
 
 
