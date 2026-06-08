@@ -38,6 +38,7 @@ func _enter_tree() -> void:
 	DLogger.info("Plugin enabled.", [], CAT)
 
 	_editor_manager = StateChartEditorManager.new(self)
+	_init_settings()
 
 	var FSIconManager := preload(
 		"res://addons/godot-statecharts_ext/editor/file_system_icon_manager.gd"
@@ -161,38 +162,43 @@ func _on_manual_scan_requested() -> void:
 	_editor_manager.manual_scan()
 
 
+func _init_settings() -> void:
+	var es := EditorInterface.get_editor_settings()
+	var setting_path := "state_charts_ext/scxml_editor_path"
+	if not es.has_setting(setting_path):
+		es.set_setting(setting_path, "")
+		es.set_initial_value(setting_path, "", false)
+		es.add_property_info(
+			{
+				"name": setting_path,
+				"type": TYPE_STRING,
+				"hint": PROPERTY_HINT_GLOBAL_FILE,
+			}
+		)
+
+
 func _open_in_external_editor(path: String) -> void:
 	var global_path := ProjectSettings.globalize_path(path)
 	var es := EditorInterface.get_editor_settings()
 
-	# 1. Try OpenNvim plugin setting if it exists
-	var nvim_path := ""
-	if es.has_setting("OpenNvim/neovim_executable"):
-		nvim_path = es.get_setting("OpenNvim/neovim_executable")
-		DLogger.info("Found OpenNvim setting: {0}", [nvim_path], CAT)
+	var editor_path: String = es.get_setting("state_charts_ext/scxml_editor_path")
 
-	# 2. Try standard external editor setting
-	if nvim_path.is_empty():
-		if es.get_setting("text_editor/external/use_external_editor"):
-			nvim_path = es.get_setting("text_editor/external/exec_path")
-			DLogger.info("Found standard external editor setting: {0}", [nvim_path], CAT)
+	if not editor_path.is_empty():
+		DLogger.info("Attempting to open {0} with custom editor: {1}", [global_path, editor_path], CAT)
+		var pid := OS.create_process(editor_path, [global_path])
+		if pid == -1:
+			DLogger.error(
+				"Failed to start process: {0}. Check if the path is correct and executable.",
+				[editor_path],
+				CAT
+			)
+		else:
+			DLogger.info("Process started with PID: {0}", [pid], CAT)
+			return
 
-	# 3. Fallback to just "nvim"
-	if nvim_path.is_empty():
-		nvim_path = "nvim"
-		DLogger.info("No setting found, falling back to: {0}", [nvim_path], CAT)
-
-	DLogger.info("Attempting to open {0} with {1}", [global_path, nvim_path], CAT)
-
-	var pid := OS.create_process(nvim_path, [global_path])
-	if pid == -1:
-		DLogger.error(
-			"Failed to start process: {0}. Check if the path is correct and executable.",
-			[nvim_path],
-			CAT
-		)
-	else:
-		DLogger.info("Process started with PID: {0}", [pid], CAT)
+	# Fallback to system default
+	DLogger.info("Opening {0} with system default.", [global_path], CAT)
+	OS.shell_open(global_path)
 
 
 func _on_export_scxml_requested() -> void:
