@@ -328,14 +328,14 @@ static func parse_scdef(text: String, fallback_name: String = "GeneratedStateCha
 			if not error_msg.is_empty():
 				break
 
-			# 2. Extract initial value
+			# Extract initial value
 			var eq_pos := line_without_brace.find("=")
 			var line_before_eq := line_without_brace
 			if eq_pos != -1:
 				p_init = line_without_brace.substr(eq_pos + 1).strip_edges()
 				line_before_eq = line_without_brace.substr(0, eq_pos).strip_edges()
 
-			# 3. Extract type
+			# Extract type
 			var p_parts := line_before_eq.split(" ", false)
 			if p_parts.size() >= 3:
 				p_type = p_parts[2].to_lower()
