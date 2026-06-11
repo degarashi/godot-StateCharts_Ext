@@ -100,7 +100,7 @@ static func sc_get_property_list(sc: StateChartExt) -> Array[Dictionary]:
 	return properties
 
 
-static func sc_validate_property(sc: StateChartExt, property: Dictionary) -> void:
+static func sc_validate_property(_sc: StateChartExt, property: Dictionary) -> void:
 	if property.name == "initial_expression_properties":
 		property.usage = PROPERTY_USAGE_STORAGE
 	elif property.name == "exclude_unused_event" or property.name == "exclude_warn_unknown_events":
