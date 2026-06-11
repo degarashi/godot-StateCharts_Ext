@@ -65,7 +65,7 @@ func _on_open_scdef_clicked(nodes: Array[Node]) -> void:
 		if not script:
 			continue
 		var script_path := script.get_path()
-		var scdef_path := script_path.get_basename() + "." + StateChartExt.SCDEF_EXTENSION
+		var scdef_path := script_path.get_basename() + "." + StateChartConstants.SCDEF_EXTENSION
 		if FileAccess.file_exists(scdef_path):
 			_plugin.get_editor_interface().edit_resource(load(scdef_path))
 			break

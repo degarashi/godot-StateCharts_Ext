@@ -12,7 +12,7 @@ var expr: String
 
 # ------------- [Callbacks] -------------
 func _init(data: Dictionary) -> void:
-	super(StateChartExt.ACTION_TYPE_ASSIGN)
+	super(StateChartConstants.ACTION_TYPE_ASSIGN)
 	location = data.get(Key.LOCATION, "")
 	expr = data.get(Key.EXPR, "")
 

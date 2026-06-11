@@ -31,7 +31,7 @@ func _parse_begin(object: Object) -> void:
 	btn_import.pressed.connect(_plugin._on_import_scxml_requested)
 	add_custom_control(btn_import)
 
-	if object.has_meta(StateChartExtScript.SCXML_PATH_META_KEY):
+	if object.has_meta(StateChartConstants.SCXML_PATH_META_KEY):
 		var btn_reimport := Button.new()
 		btn_reimport.text = "Re-import SCXML"
 		btn_reimport.icon = _plugin.get_editor_interface().get_base_control().get_theme_icon(

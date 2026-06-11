@@ -6,33 +6,8 @@
 @abstract class_name StateChartExt
 extends StateChart
 
-# ------------- [Constants] -------------
-const CAT := "state_chart"
-const PATH_SEPARATOR := "/"
-const SCDEF_EXTENSION := "scdef"
-const GD_EXTENSION := "gd"
-const SCXML_PATH_META_KEY := "statechart_ext__scxml_path"
-
-const ACTION_TYPE_SEND := "send"
-const ACTION_TYPE_ASSIGN := "assign"
-const META_ON_ENTRY := "statechart_ext__onentry"
-const META_ON_EXIT := "statechart_ext__onexit"
-
 
 # ------------- [Defines] -------------
-## Local parameter display configuration
-class LocalParam:
-	const PREFIX := "[L: "
-	const SUFFIX := "] "
-
-
-class PropGroup:
-	const PARAM := "p/"
-	const EXC_UNUSED := "exc_unused/"
-	const EXC_UNKNOWN := "exc_unknown/"
-	const HISTORY := "runtime_history/"
-
-
 ## Class to inherit user-defined parameters
 class Param:
 	extends SCInfoBase
@@ -353,7 +328,7 @@ func _ready() -> void:
 	_update_debug_event_connection()
 
 	if debug_log:
-		DLogger.debug("Initialized", [], CAT, self)
+		DLogger.debug("Initialized", [], StateChartConstants.CAT, self)
 
 	if OS.is_debug_build():
 		for ev_name in exclude_warn_unknown_events:
@@ -363,7 +338,7 @@ func _ready() -> void:
 func _on_state_entered(state: Node) -> void:
 	var msg := "Entered: {0}".format([state.name])
 	if debug_log:
-		DLogger.debug("State entered (Post): {0}", [state.name], CAT, self)
+		DLogger.debug("State entered (Post): {0}", [state.name], StateChartConstants.CAT, self)
 	if runtime_visualization:
 		state.set_meta("statechart_ext_original_name", state.name)
 		state.name = "▶ " + state.name
@@ -374,7 +349,7 @@ func _on_state_entered(state: Node) -> void:
 func _on_state_exited(state: Node) -> void:
 	var msg := "Exited: {0}".format([state.name])
 	if debug_log:
-		DLogger.debug("State exited (Post): {0}", [state.name], CAT, self)
+		DLogger.debug("State exited (Post): {0}", [state.name], StateChartConstants.CAT, self)
 	if runtime_visualization:
 		if state.has_meta("statechart_ext_original_name"):
 			state.name = state.get_meta("statechart_ext_original_name")
@@ -411,14 +386,14 @@ func _evaluate_and_assign(location: String, expr_str: String) -> void:
 			DLogger.error(
 				"Failed to execute assign expression: {0} Error: {1}",
 				[expr_str, expr.get_error_text()],
-				CAT,
+				StateChartConstants.CAT,
 				self
 			)
 	else:
 		DLogger.error(
 			"Failed to parse assign expression: {0} Error: {1}",
 			[expr_str, expr.get_error_text()],
-			CAT,
+			StateChartConstants.CAT,
 			self
 		)
 
@@ -426,9 +401,9 @@ func _evaluate_and_assign(location: String, expr_str: String) -> void:
 func _on_state_action(action_dict: Dictionary) -> void:
 	var action: SCXMLAction
 	match action_dict.get("type"):
-		ACTION_TYPE_SEND:
+		StateChartConstants.ACTION_TYPE_SEND:
 			action = SCXMLSendAction.new(action_dict)
-		ACTION_TYPE_ASSIGN:
+		StateChartConstants.ACTION_TYPE_ASSIGN:
 			action = SCXMLAssignAction.new(action_dict)
 
 	if action:
@@ -436,8 +411,8 @@ func _on_state_action(action_dict: Dictionary) -> void:
 
 
 func _on_state_entered_actions(state: Node) -> void:
-	if state.has_meta(META_ON_ENTRY):
-		var actions = state.get_meta(META_ON_ENTRY)
+	if state.has_meta(StateChartConstants.META_ON_ENTRY):
+		var actions = state.get_meta(StateChartConstants.META_ON_ENTRY)
 		if actions is Array:
 			for action_dict in actions:
 				if action_dict is Dictionary:
@@ -445,8 +420,8 @@ func _on_state_entered_actions(state: Node) -> void:
 
 
 func _on_state_exited_actions(state: Node) -> void:
-	if state.has_meta(META_ON_EXIT):
-		var actions = state.get_meta(META_ON_EXIT)
+	if state.has_meta(StateChartConstants.META_ON_EXIT):
+		var actions = state.get_meta(StateChartConstants.META_ON_EXIT)
 		if actions is Array:
 			for action_dict in actions:
 				if action_dict is Dictionary:
@@ -483,7 +458,7 @@ func _on_state_entered_context(state: StateChartState) -> void:
 				var rel_path := str(get_path_to(state))
 				if (
 					rel_path == str(ent.local_state)
-					or rel_path.ends_with(PATH_SEPARATOR + str(ent.local_state))
+					or rel_path.ends_with(StateChartConstants.PATH_SEPARATOR + str(ent.local_state))
 				):
 					is_match = true
 
@@ -513,7 +488,7 @@ func _on_state_exited_cleanup(state: StateChartState) -> void:
 
 
 func _on_event_received(event: StringName) -> void:
-	DLogger.debug("Event received: {0}", [event], CAT, self)
+	DLogger.debug("Event received: {0}", [event], StateChartConstants.CAT, self)
 
 
 func _get_configuration_warnings() -> PackedStringArray:
@@ -596,7 +571,7 @@ static func _check_parameter_type(
 		DLogger.error(
 			"Incompatible parameter type ({2}):\nExpected: {0}, Actual: {1}",
 			[type_string(expect_type_id), type_string(typeid), param_name],
-			CAT,
+			StateChartConstants.CAT,
 			context
 		)
 
@@ -762,9 +737,9 @@ func reset_internal_state() -> void:
 func reimport_scxml() -> void:
 	if not Engine.is_editor_hint():
 		return
-	var path := str(get_meta(SCXML_PATH_META_KEY, ""))
+	var path := str(get_meta(StateChartConstants.SCXML_PATH_META_KEY, ""))
 	if path.is_empty():
-		DLogger.warn("No SCXML path stored in metadata.", [], CAT, self)
+		DLogger.warn("No SCXML path stored in metadata.", [], StateChartConstants.CAT, self)
 		return
 	var importer := StateChartScxmlImporter.new()
 	importer.import_scxml(path, self)
@@ -773,7 +748,7 @@ func reimport_scxml() -> void:
 ## Manually check for configuration warnings.
 func check_errors() -> void:
 	if Engine.is_editor_hint():
-		DLogger.info("Checking configuration warnings...", [], CAT, self)
+		DLogger.info("Checking configuration warnings...", [], StateChartConstants.CAT, self)
 	_entries_cache.clear()
 	_update_all_warnings(self)
 	notify_property_list_changed()
@@ -804,11 +779,13 @@ func clear_all_metadata() -> void:
 					DLogger.info(
 						"Cleared {0} metadata entries across {1} nodes.",
 						[cleared_count, nodes.size()],
-						CAT,
+						StateChartConstants.CAT,
 						self
 					)
 				else:
-					DLogger.info("No metadata entries found to clear.", [], CAT, self)
+					DLogger.info(
+						"No metadata entries found to clear.", [], StateChartConstants.CAT, self
+					)
 				return
 
 	# Fallback for runtime execution or when editor undo/redo is not available
@@ -821,11 +798,11 @@ func clear_all_metadata() -> void:
 		DLogger.info(
 			"Cleared {0} metadata entries across {1} nodes.",
 			[cleared_count, nodes.size()],
-			CAT,
+			StateChartConstants.CAT,
 			self
 		)
 	else:
-		DLogger.info("No metadata entries found to clear.", [], CAT, self)
+		DLogger.info("No metadata entries found to clear.", [], StateChartConstants.CAT, self)
 
 
 ## Function to use instead of set_expression_property when setting parameters.
@@ -838,7 +815,12 @@ func set_expression_property_ext(
 
 	if debug_log:
 		var prev_str := "None" if prev is NoneValue else str(prev)
-		DLogger.debug("Param '{0}' changed: {1} -> {2}", [param_name, prev_str, value], CAT, self)
+		DLogger.debug(
+			"Param '{0}' changed: {1} -> {2}",
+			[param_name, prev_str, value],
+			StateChartConstants.CAT,
+			self
+		)
 
 	var can_call_base := is_instance_valid(_state)
 
@@ -877,7 +859,7 @@ func set_expression_property_local(
 		DLogger.error(
 			"set_expression_property_local: No active state context. {0}",
 			[param_ent.name],
-			CAT,
+			StateChartConstants.CAT,
 			self
 		)
 		return
@@ -909,7 +891,7 @@ func send_event_ext(event_ent: EventEnt) -> void:
 		DLogger.warn(
 			"Event '{0}' sent before any state was entered. This event will likely be lost",
 			[event_ent.name],
-			CAT,
+			StateChartConstants.CAT,
 			self
 		)
 	if is_instance_valid(_state):

@@ -15,7 +15,7 @@ static func sc_get_property_list(sc: StateChartExt) -> Array[Dictionary]:
 				"name": "StateChart Parameters",
 				"type": TYPE_NIL,
 				"usage": PROPERTY_USAGE_GROUP,
-				"hint_string": StateChartExt.PropGroup.PARAM
+				"hint_string": StateChartConstants.PropGroup.PARAM
 			}
 		)
 
@@ -28,16 +28,16 @@ static func sc_get_property_list(sc: StateChartExt) -> Array[Dictionary]:
 			if not ent.local_state.is_empty():
 				display_name = ("{0}{1}{2} {3}".format(
 					[
-						StateChartExt.LocalParam.PREFIX,
+						StateChartConstants.LocalParam.PREFIX,
 						ent.local_state,
-						StateChartExt.LocalParam.SUFFIX,
+						StateChartConstants.LocalParam.SUFFIX,
 						p_name
 					]
 				))
 
 			properties.append(
 				{
-					"name": StateChartExt.PropGroup.PARAM + display_name,
+					"name": StateChartConstants.PropGroup.PARAM + display_name,
 					"type": ent.type_id,
 					"usage": usage
 				}
@@ -50,13 +50,13 @@ static func sc_get_property_list(sc: StateChartExt) -> Array[Dictionary]:
 				"name": "Exclude Unused Warnings",
 				"type": TYPE_NIL,
 				"usage": PROPERTY_USAGE_GROUP,
-				"hint_string": StateChartExt.PropGroup.EXC_UNUSED
+				"hint_string": StateChartConstants.PropGroup.EXC_UNUSED
 			}
 		)
 		for ev_name in events:
 			properties.append(
 				{
-					"name": StateChartExt.PropGroup.EXC_UNUSED + ev_name,
+					"name": StateChartConstants.PropGroup.EXC_UNUSED + ev_name,
 					"type": TYPE_BOOL,
 					"usage": PROPERTY_USAGE_EDITOR
 				}
@@ -67,13 +67,13 @@ static func sc_get_property_list(sc: StateChartExt) -> Array[Dictionary]:
 				"name": "Exclude Unknown Warnings",
 				"type": TYPE_NIL,
 				"usage": PROPERTY_USAGE_GROUP,
-				"hint_string": StateChartExt.PropGroup.EXC_UNKNOWN
+				"hint_string": StateChartConstants.PropGroup.EXC_UNKNOWN
 			}
 		)
 		for ev_name in events:
 			properties.append(
 				{
-					"name": StateChartExt.PropGroup.EXC_UNKNOWN + ev_name,
+					"name": StateChartConstants.PropGroup.EXC_UNKNOWN + ev_name,
 					"type": TYPE_BOOL,
 					"usage": PROPERTY_USAGE_EDITOR
 				}
@@ -85,13 +85,13 @@ static func sc_get_property_list(sc: StateChartExt) -> Array[Dictionary]:
 				"name": "Runtime History (Latest first)",
 				"type": TYPE_NIL,
 				"usage": PROPERTY_USAGE_GROUP,
-				"hint_string": StateChartExt.PropGroup.HISTORY
+				"hint_string": StateChartConstants.PropGroup.HISTORY
 			}
 		)
 		for i in range(sc._runtime_history.size()):
 			properties.append(
 				{
-					"name": StateChartExt.PropGroup.HISTORY + str(i),
+					"name": StateChartConstants.PropGroup.HISTORY + str(i),
 					"type": TYPE_STRING,
 					"usage": PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_READ_ONLY
 				}
@@ -113,24 +113,24 @@ static func sc_get_property(sc: StateChartExt, property: StringName) -> Variant:
 	if property == &"p":
 		return sc._p_dyn
 
-	if property.begins_with(StateChartExt.PropGroup.EXC_UNUSED):
-		var ev_name := property.trim_prefix(StateChartExt.PropGroup.EXC_UNUSED)
+	if property.begins_with(StateChartConstants.PropGroup.EXC_UNUSED):
+		var ev_name := property.trim_prefix(StateChartConstants.PropGroup.EXC_UNUSED)
 		return ev_name in sc.exclude_unused_event
 
-	if property.begins_with(StateChartExt.PropGroup.EXC_UNKNOWN):
-		var ev_name := property.trim_prefix(StateChartExt.PropGroup.EXC_UNKNOWN)
+	if property.begins_with(StateChartConstants.PropGroup.EXC_UNKNOWN):
+		var ev_name := property.trim_prefix(StateChartConstants.PropGroup.EXC_UNKNOWN)
 		return ev_name in sc.exclude_warn_unknown_events
 
-	if property.begins_with(StateChartExt.PropGroup.HISTORY):
-		var idx := int(property.trim_prefix(StateChartExt.PropGroup.HISTORY))
+	if property.begins_with(StateChartConstants.PropGroup.HISTORY):
+		var idx := int(property.trim_prefix(StateChartConstants.PropGroup.HISTORY))
 		if idx < sc._runtime_history.size():
 			return sc._runtime_history[idx]
 		return ""
 
-	if property.begins_with(StateChartExt.PropGroup.PARAM):
-		var p_name := property.trim_prefix(StateChartExt.PropGroup.PARAM)
+	if property.begins_with(StateChartConstants.PropGroup.PARAM):
+		var p_name := property.trim_prefix(StateChartConstants.PropGroup.PARAM)
 		# Handle local param display name
-		if p_name.contains(StateChartExt.LocalParam.PREFIX):
+		if p_name.contains(StateChartConstants.LocalParam.PREFIX):
 			var parts := p_name.split(" ")
 			p_name = parts[-1]
 
@@ -151,19 +151,19 @@ static func sc_set_property(sc: StateChartExt, property: StringName, value: Vari
 		sc._p_dyn = value
 		return true
 
-	if property.begins_with(StateChartExt.PropGroup.EXC_UNUSED):
-		var ev_name := StringName(property.trim_prefix(StateChartExt.PropGroup.EXC_UNUSED))
+	if property.begins_with(StateChartConstants.PropGroup.EXC_UNUSED):
+		var ev_name := StringName(property.trim_prefix(StateChartConstants.PropGroup.EXC_UNUSED))
 		sc._update_exclusion_list(sc.exclude_unused_event, ev_name, value)
 		return true
 
-	if property.begins_with(StateChartExt.PropGroup.EXC_UNKNOWN):
-		var ev_name := StringName(property.trim_prefix(StateChartExt.PropGroup.EXC_UNKNOWN))
+	if property.begins_with(StateChartConstants.PropGroup.EXC_UNKNOWN):
+		var ev_name := StringName(property.trim_prefix(StateChartConstants.PropGroup.EXC_UNKNOWN))
 		sc._update_exclusion_list(sc.exclude_warn_unknown_events, ev_name, value)
 		return true
 
-	if property.begins_with(StateChartExt.PropGroup.PARAM):
-		var p_name := property.trim_prefix(StateChartExt.PropGroup.PARAM)
-		if p_name.contains(StateChartExt.LocalParam.PREFIX):
+	if property.begins_with(StateChartConstants.PropGroup.PARAM):
+		var p_name := property.trim_prefix(StateChartConstants.PropGroup.PARAM)
+		if p_name.contains(StateChartConstants.LocalParam.PREFIX):
 			var parts := p_name.split(" ")
 			p_name = parts[-1]
 

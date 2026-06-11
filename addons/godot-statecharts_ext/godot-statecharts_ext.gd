@@ -7,11 +7,11 @@ extends EditorPlugin
 # ------------- [Constants] -------------
 const CAT = "ScExt_Gen"
 const MENU_FORCE_REGENERATE := (
-	"StateChartExt: Force Regenerate all ." + StateChartExt.SCDEF_EXTENSION
+	"StateChartExt: Force Regenerate all ." + StateChartConstants.SCDEF_EXTENSION
 )
 const MENU_EXPORT_SCXML := "StateChartExt: Export current StateChart as SCXML"
 const MENU_IMPORT_SCXML := "StateChartExt: Import SCXML to current StateChart"
-const MENU_CONVERT_SCXML := "StateChartExt: Convert SCXML to ." + StateChartExt.SCDEF_EXTENSION
+const MENU_CONVERT_SCXML := "StateChartExt: Convert SCXML to ." + StateChartConstants.SCDEF_EXTENSION
 
 const FileSystemContextMenuScript := preload(
 	"res://addons/godot-statecharts_ext/editor/context_menu_filesystem.gd"
@@ -49,7 +49,7 @@ func _enter_tree() -> void:
 	_import_plugin = DummyImportPlugin.new(
 		"statechart_ext_scdef",
 		"StateChart Definition",
-		[StateChartExt.SCDEF_EXTENSION],
+		[StateChartConstants.SCDEF_EXTENSION],
 		"StateChartDefinition"
 	)
 	add_import_plugin(_import_plugin)

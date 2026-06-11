@@ -15,7 +15,7 @@ func _popup_menu(paths: PackedStringArray) -> void:
 	for path in paths:
 		if path.ends_with(".scxml"):
 			scxml_paths.append(path)
-		elif path.ends_with("." + StateChartExt.SCDEF_EXTENSION):
+		elif path.ends_with("." + StateChartConstants.SCDEF_EXTENSION):
 			scdef_paths.append(path)
 
 	if not scxml_paths.is_empty():
@@ -23,7 +23,7 @@ func _popup_menu(paths: PackedStringArray) -> void:
 			"Object", "EditorIcons"
 		)
 		add_context_menu_item(
-			"Convert SCXML to ." + StateChartExt.SCDEF_EXTENSION,
+			"Convert SCXML to ." + StateChartConstants.SCDEF_EXTENSION,
 			_on_convert_clicked.bind(scxml_paths).unbind(1),
 			icon
 		)

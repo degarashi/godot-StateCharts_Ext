@@ -16,7 +16,7 @@ var params: Array
 
 # ------------- [Public Method] -------------
 func _init(data: Dictionary) -> void:
-	super(StateChartExt.ACTION_TYPE_SEND)
+	super(StateChartConstants.ACTION_TYPE_SEND)
 	event = data.get(Key.EVENT, "")
 	params = data.get(Key.PARAMS, [])
 

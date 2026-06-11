@@ -38,7 +38,7 @@ func scan_dir_recursive(path: String) -> void:
 				scan_dir_recursive(path.path_join(file_name))
 		else:
 			var full_path := path.path_join(file_name)
-			if file_name.ends_with("." + StateChartExt.SCDEF_EXTENSION):
+			if file_name.ends_with("." + StateChartConstants.SCDEF_EXTENSION):
 				process_scdef_file(full_path)
 			elif file_name.ends_with(".scxml"):
 				convert_scxml_to_scdef_if_needed(full_path)
@@ -48,7 +48,7 @@ func scan_dir_recursive(path: String) -> void:
 
 
 func convert_scxml_to_scdef_if_needed(scxml_path: String) -> void:
-	var scdef_path := scxml_path.get_basename() + "." + StateChartExt.SCDEF_EXTENSION
+	var scdef_path := scxml_path.get_basename() + "." + StateChartConstants.SCDEF_EXTENSION
 	var scdef_content := StateChartScxmlImporter.generate_scdef(scxml_path)
 
 	if scdef_content.is_empty():
@@ -72,7 +72,7 @@ func convert_scxml_to_scdef_if_needed(scxml_path: String) -> void:
 
 
 func process_scdef_file(scdef_path: String) -> void:
-	var gd_path := scdef_path.get_basename() + "." + StateChartExt.GD_EXTENSION
+	var gd_path := scdef_path.get_basename() + "." + StateChartConstants.GD_EXTENSION
 
 	var f_scdef := FileAccess.open(scdef_path, FileAccess.READ)
 	if not f_scdef:
@@ -155,7 +155,7 @@ func request_convert_scxml_to_scdef() -> void:
 
 
 func on_scxml_convert_file_selected(path: String) -> void:
-	var scdef_path := path.get_basename() + "." + StateChartExt.SCDEF_EXTENSION
+	var scdef_path := path.get_basename() + "." + StateChartConstants.SCDEF_EXTENSION
 	var scdef_content := StateChartScxmlImporter.generate_scdef(path)
 
 	if not scdef_content.is_empty():
@@ -185,7 +185,7 @@ func _on_scxml_import_file_selected(path: String) -> void:
 	if selected_nodes.is_empty() or not selected_nodes[0] is StateChartExt:
 		return
 
-	var scdef_path := path.get_basename() + "." + StateChartExt.SCDEF_EXTENSION
+	var scdef_path := path.get_basename() + "." + StateChartConstants.SCDEF_EXTENSION
 	var scdef_content := StateChartScxmlImporter.generate_scdef(path)
 	if not scdef_content.is_empty():
 		var f_scdef := FileAccess.open(scdef_path, FileAccess.WRITE)
@@ -198,7 +198,7 @@ func _on_scxml_import_file_selected(path: String) -> void:
 	var importer := StateChartScxmlImporter.new()
 	var err := importer.import_scxml(path, selected_nodes[0])
 	if err == OK:
-		var gd_path := scdef_path.get_basename() + "." + StateChartExt.GD_EXTENSION
+		var gd_path := scdef_path.get_basename() + "." + StateChartConstants.GD_EXTENSION
 		var script := load(gd_path) as Script
 		if script:
 			selected_nodes[0].set_script(script)

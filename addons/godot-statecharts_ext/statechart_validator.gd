@@ -72,7 +72,7 @@ static func _check_transition_overlap_internal(
 
 	for c in node.get_children():
 		if not c is Transition:
-			var child_path := path + StateChartExt.PATH_SEPARATOR + c.name
+			var child_path := path + StateChartConstants.PATH_SEPARATOR + c.name
 			_check_transition_overlap_internal(err_msg, c, child_path)
 
 static func _get_guard_signature(g: Guard) -> String:
@@ -132,7 +132,7 @@ static func _check_param_internal(
 	dst: PackedStringArray, sc: StateChartExt, node: Node, path: String, param_def: Dictionary[String, int]
 ) -> void:
 	for c in node.get_children():
-		var child_path := path + StateChartExt.PATH_SEPARATOR + c.name
+		var child_path := path + StateChartConstants.PATH_SEPARATOR + c.name
 		if c is Transition:
 			var g_a := _find_expression_guard(dst, child_path, c.guard)
 			for g in g_a:
@@ -176,7 +176,7 @@ static func _check_event_typo_internal(
 	exclude_ev: PackedStringArray
 ) -> void:
 	for c in node.get_children():
-		var child_path := path + StateChartExt.PATH_SEPARATOR + c.name
+		var child_path := path + StateChartConstants.PATH_SEPARATOR + c.name
 		if c is Transition:
 			if not c.event.is_empty() and c.event not in events and c.event not in exclude_ev:
 				err_msg.append("Unknown event: {1}\n at [{0}]".format([child_path, c.event]))
