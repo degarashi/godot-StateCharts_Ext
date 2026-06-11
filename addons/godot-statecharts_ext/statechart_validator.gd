@@ -1,6 +1,7 @@
 class_name StateChartValidator
 extends RefCounted
 
+
 static func get_warnings(sc: StateChartExt) -> PackedStringArray:
 	var warnings: PackedStringArray = []
 	var sc_info := sc.get_sc_info()
@@ -34,8 +35,10 @@ static func get_warnings(sc: StateChartExt) -> PackedStringArray:
 
 	return warnings
 
+
 static func _check_transition_overlap(err_msg: PackedStringArray, sc: StateChartExt) -> void:
 	_check_transition_overlap_internal(err_msg, sc, "")
+
 
 static func _check_transition_overlap_internal(
 	err_msg: PackedStringArray, node: Node, path: String
@@ -65,15 +68,28 @@ static func _check_transition_overlap_internal(
 					var names: Array[String] = []
 					for t in overlapping:
 						names.append(t.name)
-					err_msg.append(
-						"Overlapping transitions (same event and guard) at [{0}]: event='{1}', guard='{2}', transitions=[{3}]"
-						. format([path if not path.is_empty() else "Root", ev, sig, ", ".join(names)])
+					(
+						err_msg
+						. append(
+							(
+								"Overlapping transitions (same event and guard) at [{0}]: event='{1}', guard='{2}', transitions=[{3}]"
+								. format(
+									[
+										path if not path.is_empty() else "Root",
+										ev,
+										sig,
+										", ".join(names)
+									]
+								)
+							)
+						)
 					)
 
 	for c in node.get_children():
 		if not c is Transition:
 			var child_path := path + StateChartConstants.PATH_SEPARATOR + c.name
 			_check_transition_overlap_internal(err_msg, c, child_path)
+
 
 static func _get_guard_signature(g: Guard) -> String:
 	if g == null:
@@ -98,8 +114,12 @@ static func _get_guard_signature(g: Guard) -> String:
 		return "any(" + ",".join(parts) + ")"
 	return str(g)
 
+
 static func _check_unused_events(
-	warnings: PackedStringArray, sc: StateChartExt, event: Dictionary[String, StateChartExt.EntBase], exclude_ev: PackedStringArray
+	warnings: PackedStringArray,
+	sc: StateChartExt,
+	event: Dictionary[String, StateChartExt.EntBase],
+	exclude_ev: PackedStringArray
 ) -> void:
 	var using_event := _collect_using_event(sc)
 	var unused_event := event.keys()
@@ -110,6 +130,7 @@ static func _check_unused_events(
 	if unused_event.size() > 0:
 		warnings.append("unused event(s):\n" + ", ".join(unused_event))
 
+
 static func _collect_using_event(sc: StateChartExt) -> PackedStringArray:
 	var using_set: Dictionary[String, bool] = {}
 	_collect_using_event_internal(using_set, sc)
@@ -118,6 +139,7 @@ static func _collect_using_event(sc: StateChartExt) -> PackedStringArray:
 		using_ev_str.append(event_name)
 	return using_ev_str
 
+
 static func _collect_using_event_internal(dst: Dictionary[String, bool], node: Node) -> void:
 	for c in node.get_children():
 		if c is Transition and not c.event.is_empty():
@@ -125,11 +147,19 @@ static func _collect_using_event_internal(dst: Dictionary[String, bool], node: N
 		else:
 			_collect_using_event_internal(dst, c)
 
-static func _check_param(dst: PackedStringArray, sc: StateChartExt, param_def: Dictionary[String, int]) -> void:
+
+static func _check_param(
+	dst: PackedStringArray, sc: StateChartExt, param_def: Dictionary[String, int]
+) -> void:
 	_check_param_internal(dst, sc, sc, "", param_def)
 
+
 static func _check_param_internal(
-	dst: PackedStringArray, sc: StateChartExt, node: Node, path: String, param_def: Dictionary[String, int]
+	dst: PackedStringArray,
+	sc: StateChartExt,
+	node: Node,
+	path: String,
+	param_def: Dictionary[String, int]
 ) -> void:
 	for c in node.get_children():
 		var child_path := path + StateChartConstants.PATH_SEPARATOR + c.name
@@ -140,8 +170,13 @@ static func _check_param_internal(
 		else:
 			_check_param_internal(dst, sc, c, child_path, param_def)
 
+
 static func _check_expression(
-	dst: PackedStringArray, sc: StateChartExt, path: String, exp_str: String, param_def: Dictionary[String, int]
+	dst: PackedStringArray,
+	sc: StateChartExt,
+	path: String,
+	exp_str: String,
+	param_def: Dictionary[String, int]
 ) -> void:
 	var params: PackedStringArray = []
 	for k in param_def.keys():
@@ -162,10 +197,15 @@ static func _check_expression(
 			"Expression execution error: {1}\n at [{0}]".format([path, expr.get_error_text()])
 		)
 
+
 static func _check_event_typo(
-	err_msg: PackedStringArray, sc: StateChartExt, events: Dictionary[String, StateChartExt.EntBase], exclude_ev: PackedStringArray
+	err_msg: PackedStringArray,
+	sc: StateChartExt,
+	events: Dictionary[String, StateChartExt.EntBase],
+	exclude_ev: PackedStringArray
 ) -> void:
 	_check_event_typo_internal(err_msg, sc, sc, "", events, exclude_ev)
+
 
 static func _check_event_typo_internal(
 	err_msg: PackedStringArray,
@@ -182,6 +222,7 @@ static func _check_event_typo_internal(
 				err_msg.append("Unknown event: {1}\n at [{0}]".format([child_path, c.event]))
 		else:
 			_check_event_typo_internal(err_msg, sc, c, child_path, events, exclude_ev)
+
 
 static func _find_expression_guard(
 	warnings: PackedStringArray, path: String, g: Guard

@@ -13,7 +13,6 @@ func _can_handle(object: Object) -> bool:
 
 
 func _parse_begin(object: Object) -> void:
-
 	# Also add a button to open in external editor for convenience
 	var btn := Button.new()
 	btn.text = "Open in External Editor"
