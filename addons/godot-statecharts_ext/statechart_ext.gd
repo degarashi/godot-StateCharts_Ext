@@ -12,10 +12,7 @@ const PATH_SEPARATOR := "/"
 const SCDEF_EXTENSION := "scdef"
 const GD_EXTENSION := "gd"
 const SCXML_PATH_META_KEY := "statechart_ext__scxml_path"
-const PROP_GROUP_PARAM := "p/"
-const PROP_GROUP_EXC_UNUSED := "exc_unused/"
-const PROP_GROUP_EXC_UNKNOWN := "exc_unknown/"
-const PROP_GROUP_HISTORY := "runtime_history/"
+
 const ACTION_TYPE_SEND := "send"
 const ACTION_TYPE_ASSIGN := "assign"
 const META_ON_ENTRY := "statechart_ext__onentry"
@@ -27,6 +24,13 @@ const META_ON_EXIT := "statechart_ext__onexit"
 class LocalParam:
 	const PREFIX := "[L: "
 	const SUFFIX := "] "
+
+
+class PropGroup:
+	const PARAM := "p/"
+	const EXC_UNUSED := "exc_unused/"
+	const EXC_UNKNOWN := "exc_unknown/"
+	const HISTORY := "runtime_history/"
 
 
 ## Class to inherit user-defined parameters
@@ -568,7 +572,9 @@ static func _init_and_get_entries(
 	return ret
 
 
-static func init_and_get_entries(source: Script, entry_target: Script) -> Dictionary[String, EntBase]:
+static func init_and_get_entries(
+	source: Script, entry_target: Script
+) -> Dictionary[String, EntBase]:
 	return _init_and_get_entries(source, entry_target)
 
 
@@ -711,6 +717,7 @@ func _update_debug_event_connection() -> void:
 	else:
 		if is_con:
 			event_received.disconnect(_on_event_received)
+
 
 func _update_exclusion_list(list: Array[StringName], ev_name: StringName, enabled: bool) -> void:
 	if enabled:
