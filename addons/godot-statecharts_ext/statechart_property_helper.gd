@@ -1,4 +1,4 @@
-class_name StateChartInspector
+class_name StateChartPropertyHelper
 extends RefCounted
 
 

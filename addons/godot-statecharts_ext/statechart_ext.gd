@@ -270,19 +270,19 @@ var _runtime_history: Array[String] = []
 
 # ------------- [Callbacks] -------------
 func _get_property_list() -> Array[Dictionary]:
-	return StateChartInspector.sc_get_property_list(self)
+	return StateChartPropertyHelper.sc_get_property_list(self)
 
 
 func _validate_property(property: Dictionary) -> void:
-	StateChartInspector.sc_validate_property(self, property)
+	StateChartPropertyHelper.sc_validate_property(self, property)
 
 
 func _get(property: StringName) -> Variant:
-	return StateChartInspector.sc_get_property(self, property)
+	return StateChartPropertyHelper.sc_get_property(self, property)
 
 
 func _set(property: StringName, value: Variant) -> bool:
-	return StateChartInspector.sc_set_property(self, property, value)
+	return StateChartPropertyHelper.sc_set_property(self, property, value)
 
 
 func _enter_tree() -> void:
