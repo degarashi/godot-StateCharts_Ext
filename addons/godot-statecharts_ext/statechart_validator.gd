@@ -30,7 +30,73 @@ static func get_warnings(sc: StateChartExt) -> PackedStringArray:
 		_check_event_typo(warnings, sc, event, exclude_ev)
 		_check_unused_events(warnings, sc, event, exclude_ev)
 
+	_check_transition_overlap(warnings, sc)
+
 	return warnings
+
+static func _check_transition_overlap(err_msg: PackedStringArray, sc: StateChartExt) -> void:
+	_check_transition_overlap_internal(err_msg, sc, "")
+
+static func _check_transition_overlap_internal(
+	err_msg: PackedStringArray, node: Node, path: String
+) -> void:
+	var transitions_by_event: Dictionary = {}  # event -> Array[Transition]
+
+	for c in node.get_children():
+		if c is Transition:
+			var ev := StringName(c.event)
+			if not transitions_by_event.has(ev):
+				transitions_by_event[ev] = []
+			transitions_by_event[ev].append(c)
+
+	for ev in transitions_by_event:
+		var trans_list: Array = transitions_by_event[ev]
+		if trans_list.size() > 1:
+			var signatures: Dictionary = {}  # sig -> Array[Transition]
+			for t in trans_list:
+				var sig := _get_guard_signature(t.guard)
+				if not signatures.has(sig):
+					signatures[sig] = []
+				signatures[sig].append(t)
+
+			for sig in signatures:
+				var overlapping: Array = signatures[sig]
+				if overlapping.size() > 1:
+					var names: Array[String] = []
+					for t in overlapping:
+						names.append(t.name)
+					err_msg.append(
+						"Overlapping transitions (same event and guard) at [{0}]: event='{1}', guard='{2}', transitions=[{3}]"
+						. format([path if not path.is_empty() else "Root", ev, sig, ", ".join(names)])
+					)
+
+	for c in node.get_children():
+		if not c is Transition:
+			var child_path := path + StateChartExt.PATH_SEPARATOR + c.name
+			_check_transition_overlap_internal(err_msg, c, child_path)
+
+static func _get_guard_signature(g: Guard) -> String:
+	if g == null:
+		return "<any>"
+	if g is ExpressionGuard:
+		return "expr:" + g.expression
+	if g is StateIsActiveGuard:
+		return "active:" + str(g.state)
+	if g is NotGuard:
+		return "not(" + _get_guard_signature(g.guard) + ")"
+	if g is AllOfGuard:
+		var parts: Array[String] = []
+		for child in g.guards:
+			parts.append(_get_guard_signature(child))
+		parts.sort()
+		return "all(" + ",".join(parts) + ")"
+	if g is AnyOfGuard:
+		var parts: Array[String] = []
+		for child in g.guards:
+			parts.append(_get_guard_signature(child))
+		parts.sort()
+		return "any(" + ",".join(parts) + ")"
+	return str(g)
 
 static func _check_unused_events(
 	warnings: PackedStringArray, sc: StateChartExt, event: Dictionary[String, StateChartExt.EntBase], exclude_ev: PackedStringArray
