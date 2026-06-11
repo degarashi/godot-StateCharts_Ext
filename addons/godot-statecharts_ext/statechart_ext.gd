@@ -8,8 +8,6 @@ extends StateChart
 
 # ------------- [Constants] -------------
 const CAT := "state_chart"
-const LOCAL_PARAM_PREFIX := "[L: "
-const LOCAL_PARAM_SUFFIX := "] "
 const PATH_SEPARATOR := "/"
 const SCDEF_EXTENSION := "scdef"
 const GD_EXTENSION := "gd"
@@ -25,6 +23,12 @@ const META_ON_EXIT := "statechart_ext__onexit"
 
 
 # ------------- [Defines] -------------
+## Local parameter display configuration
+class LocalParam:
+	const PREFIX := "[L: "
+	const SUFFIX := "] "
+
+
 ## Class to inherit user-defined parameters
 class Param:
 	extends SCInfoBase

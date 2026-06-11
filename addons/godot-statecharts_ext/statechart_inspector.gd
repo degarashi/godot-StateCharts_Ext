@@ -28,9 +28,9 @@ static func sc_get_property_list(sc: StateChartExt) -> Array[Dictionary]:
 			if not ent.local_state.is_empty():
 				display_name = ("{0}{1}{2} {3}".format(
 					[
-						StateChartExt.LOCAL_PARAM_PREFIX,
+						StateChartExt.LocalParam.PREFIX,
 						ent.local_state,
-						StateChartExt.LOCAL_PARAM_SUFFIX,
+						StateChartExt.LocalParam.SUFFIX,
 						p_name
 					]
 				))
@@ -130,7 +130,7 @@ static func sc_get_property(sc: StateChartExt, property: StringName) -> Variant:
 	if property.begins_with(StateChartExt.PROP_GROUP_PARAM):
 		var p_name := property.trim_prefix(StateChartExt.PROP_GROUP_PARAM)
 		# Handle local param display name
-		if p_name.contains(StateChartExt.LOCAL_PARAM_PREFIX):
+		if p_name.contains(StateChartExt.LocalParam.PREFIX):
 			var parts := p_name.split(" ")
 			p_name = parts[-1]
 
@@ -163,7 +163,7 @@ static func sc_set_property(sc: StateChartExt, property: StringName, value: Vari
 
 	if property.begins_with(StateChartExt.PROP_GROUP_PARAM):
 		var p_name := property.trim_prefix(StateChartExt.PROP_GROUP_PARAM)
-		if p_name.contains(StateChartExt.LOCAL_PARAM_PREFIX):
+		if p_name.contains(StateChartExt.LocalParam.PREFIX):
 			var parts := p_name.split(" ")
 			p_name = parts[-1]
 
