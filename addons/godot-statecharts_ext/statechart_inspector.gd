@@ -1,6 +1,7 @@
 class_name StateChartInspector
 extends RefCounted
 
+
 static func sc_get_property_list(sc: StateChartExt) -> Array[Dictionary]:
 	var properties: Array[Dictionary] = []
 	var sc_info: StateChartExt.SCInfo = sc.get_sc_info()
@@ -26,11 +27,20 @@ static func sc_get_property_list(sc: StateChartExt) -> Array[Dictionary]:
 			var display_name := p_name
 			if not ent.local_state.is_empty():
 				display_name = ("{0}{1}{2} {3}".format(
-					[StateChartExt.LOCAL_PARAM_PREFIX, ent.local_state, StateChartExt.LOCAL_PARAM_SUFFIX, p_name]
+					[
+						StateChartExt.LOCAL_PARAM_PREFIX,
+						ent.local_state,
+						StateChartExt.LOCAL_PARAM_SUFFIX,
+						p_name
+					]
 				))
 
 			properties.append(
-				{"name": StateChartExt.PROP_GROUP_PARAM + display_name, "type": ent.type_id, "usage": usage}
+				{
+					"name": StateChartExt.PROP_GROUP_PARAM + display_name,
+					"type": ent.type_id,
+					"usage": usage
+				}
 			)
 
 	var events := StateChartExt._init_and_get_entries(sc_info.event, StateChartExt.EventEnt)
@@ -89,11 +99,13 @@ static func sc_get_property_list(sc: StateChartExt) -> Array[Dictionary]:
 
 	return properties
 
+
 static func sc_validate_property(sc: StateChartExt, property: Dictionary) -> void:
 	if property.name == "initial_expression_properties":
 		property.usage = PROPERTY_USAGE_STORAGE
 	elif property.name == "exclude_unused_event" or property.name == "exclude_warn_unknown_events":
 		property.usage = PROPERTY_USAGE_STORAGE
+
 
 static func sc_get_property(sc: StateChartExt, property: StringName) -> Variant:
 	if property == &"e":
@@ -121,14 +133,15 @@ static func sc_get_property(sc: StateChartExt, property: StringName) -> Variant:
 		if p_name.contains(StateChartExt.LOCAL_PARAM_PREFIX):
 			var parts := p_name.split(" ")
 			p_name = parts[-1]
-		
+
 		var sc_info: StateChartExt.SCInfo = sc.get_sc_info()
 		if sc_info:
 			var params := StateChartExt._init_and_get_entries(sc_info.param, StateChartExt.ParamEnt)
 			if params.has(p_name):
 				return sc.get_expression_property_ext(params[p_name] as StateChartExt.ParamEnt)
-	
+
 	return null
+
 
 static func sc_set_property(sc: StateChartExt, property: StringName, value: Variant) -> bool:
 	if property == &"e":
@@ -153,12 +166,12 @@ static func sc_set_property(sc: StateChartExt, property: StringName, value: Vari
 		if p_name.contains(StateChartExt.LOCAL_PARAM_PREFIX):
 			var parts := p_name.split(" ")
 			p_name = parts[-1]
-		
+
 		var sc_info: StateChartExt.SCInfo = sc.get_sc_info()
 		if sc_info:
 			var params := StateChartExt._init_and_get_entries(sc_info.param, StateChartExt.ParamEnt)
 			if params.has(p_name):
 				sc.set_expression_property_ext(params[p_name] as StateChartExt.ParamEnt, value)
 				return true
-	
+
 	return false

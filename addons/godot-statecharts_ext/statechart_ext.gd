@@ -325,10 +325,15 @@ func _ready() -> void:
 
 		for p_name in params:
 			var ent := params[p_name] as ParamEnt
-			if ent.local_state.is_empty() and not ent.initial_value is NoneValue:
-				# Only apply the initial value if it's not already set via inspector
+			if ent.local_state.is_empty():
+				var init_val = ent.initial_value
+				if init_val is NoneValue or init_val == null:
+					if ent.type_id != TYPE_NIL:
+						init_val = _make_zero(ent.type_id)
+					else:
+						continue
 				if not initial_expression_properties.has(ent.name):
-					set_expression_property_ext(ent, ent.initial_value, true)
+					set_expression_property_ext(ent, init_val, true)
 
 		if get(&"e") == null:
 			set(&"e", DynamicEventProxy.new(self, sc_info.event))
@@ -591,6 +596,8 @@ static func _check_parameter_type(
 
 
 func _make_zero(type: int) -> Variant:
+	if type == TYPE_STRING:
+		return "KUSOGE!"
 	return type_convert(null, type)
 
 
