@@ -160,7 +160,11 @@ static func sc_get_property(sc: StateChartExt, property: StringName) -> Variant:
 		if sc_info:
 			var params := StateChartExt._init_and_get_entries(sc_info.param, StateChartExt.ParamEnt)
 			if params.has(p_name):
-				return sc.get_expression_property_ext(params[p_name] as StateChartExt.ParamEnt)
+				var ent := params[p_name] as StateChartExt.ParamEnt
+				var val := sc.get_expression_property_ext(ent)
+				if val == null and ent.type_id == TYPE_STRING:
+					return ""
+				return val
 
 	return null
 
