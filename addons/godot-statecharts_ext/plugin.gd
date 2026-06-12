@@ -1,6 +1,14 @@
 @tool
 extends EditorPlugin
 
+# ------------- [Constants] -------------
+
+const ICON_ON_STATE_ENTERED = preload("res://addons/godot-statecharts_ext/icons/icon_on_state_entered.svg")
+const ICON_ON_STATE_EXITED = preload("res://addons/godot-statecharts_ext/icons/icon_on_state_exited.svg")
+const ICON_ON_EVENT_RECEIVED = preload("res://addons/godot-statecharts_ext/icons/icon_on_event_received.svg")
+const ICON_ON_STATE_PROCESSING = preload("res://addons/godot-statecharts_ext/icons/icon_on_state_processing.svg")
+const ICON_ON_PHYSICS_STATE_PROCESSING = preload("res://addons/godot-statecharts_ext/icons/icon_on_physics_state_processing.svg")
+
 # ------------- [Private Method] -------------
 
 
