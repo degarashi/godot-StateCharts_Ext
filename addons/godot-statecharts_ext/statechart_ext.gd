@@ -6,6 +6,8 @@
 @abstract class_name StateChartExt
 extends StateChart
 
+static var _log := DLoggerClass.new(StateChartConstants.CAT)
+
 
 # ------------- [Defines] -------------
 ## Class to inherit user-defined parameters
@@ -338,7 +340,7 @@ func _ready() -> void:
 	_update_debug_event_connection()
 
 	if debug_log:
-		DLogger.debug("Initialized", [], StateChartConstants.CAT, self)
+		_log.debug("Initialized", [], "", self)
 
 	if OS.is_debug_build():
 		for ev_name in exclude_warn_unknown_events:
@@ -348,8 +350,8 @@ func _ready() -> void:
 func _on_state_entered(state: Node) -> void:
 	var msg := "Entered: {0}".format([state.name])
 	if debug_log:
-		DLogger.debug("State entered (Post): {0}", [state.name], StateChartConstants.CAT, self)
-	
+		_log.debug("State entered (Post): {0}", [state.name], "", self)
+
 	_add_history(msg)
 	_update_visualization()
 
@@ -357,7 +359,7 @@ func _on_state_entered(state: Node) -> void:
 func _on_state_exited(state: Node) -> void:
 	var msg := "Exited: {0}".format([state.name])
 	if debug_log:
-		DLogger.debug("State exited (Post): {0}", [state.name], StateChartConstants.CAT, self)
+		_log.debug("State exited (Post): {0}", [state.name], "", self)
 
 	_add_history(msg)
 	_update_visualization()
@@ -389,17 +391,17 @@ func _evaluate_and_assign(location: String, expr_str: String) -> void:
 		if not expr.has_execute_failed():
 			_set_expression_property_untyped(location, result)
 		else:
-			DLogger.error(
+			_log.error(
 				"Failed to execute assign expression: {0} Error: {1}",
 				[expr_str, expr.get_error_text()],
-				StateChartConstants.CAT,
+				"",
 				self
 			)
 	else:
-		DLogger.error(
+		_log.error(
 			"Failed to parse assign expression: {0} Error: {1}",
 			[expr_str, expr.get_error_text()],
-			StateChartConstants.CAT,
+			"",
 			self
 		)
 
@@ -494,7 +496,7 @@ func _on_state_exited_cleanup(state: StateChartState) -> void:
 
 
 func _on_event_received(event: StringName) -> void:
-	DLogger.debug("Event received: {0}", [event], StateChartConstants.CAT, self)
+	_log.debug("Event received: {0}", [event], "", self)
 
 
 func _get_configuration_warnings() -> PackedStringArray:
@@ -574,10 +576,10 @@ static func _check_parameter_type(
 		return
 	var typeid := typeof(actual_value)
 	if typeid != expect_type_id:
-		DLogger.error(
+		_log.error(
 			"Incompatible parameter type ({2}):\nExpected: {0}, Actual: {1}",
 			[type_string(expect_type_id), type_string(typeid), param_name],
-			StateChartConstants.CAT,
+			"",
 			context
 		)
 
@@ -738,17 +740,19 @@ func _update_visualization() -> void:
 		add_child(_visualizer_canvas)
 
 		_visualizer_label = Label.new()
-		_visualizer_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT, Control.PRESET_MODE_MINSIZE, 10)
+		_visualizer_label.set_anchors_and_offsets_preset(
+			Control.PRESET_TOP_LEFT, Control.PRESET_MODE_MINSIZE, 10
+		)
 		_visualizer_label.add_theme_color_override("font_color", Color.YELLOW)
 		_visualizer_label.add_theme_font_size_override("font_size", 14)
-		
+
 		# Background
 		var style := StyleBoxFlat.new()
 		style.bg_color = Color(0, 0, 0, 0.4)
 		style.content_margin_left = 5
 		style.content_margin_right = 5
 		_visualizer_label.add_theme_stylebox_override("normal", style)
-		
+
 		_visualizer_canvas.add_child(_visualizer_label)
 
 	var active_names: Array[String] = []
@@ -757,13 +761,13 @@ func _update_visualization() -> void:
 			active_names.append(state.name)
 
 	_visualizer_label.text = "[{0}] {1}".format([name, " > ".join(active_names)])
-	
+
 	# Adjust position if multiple StateChartExt are present
 	var sc_ext_nodes := get_tree().get_nodes_in_group("statechart_ext_active_visualizers")
 	if not is_in_group("statechart_ext_active_visualizers"):
 		add_to_group("statechart_ext_active_visualizers")
 		sc_ext_nodes.append(self)
-	
+
 	var index := sc_ext_nodes.find(self)
 	_visualizer_label.position.y = 10 + (index * 25)
 
@@ -792,7 +796,7 @@ func reimport_scxml() -> void:
 		return
 	var path := str(get_meta(StateChartConstants.SCXML_PATH_META_KEY, ""))
 	if path.is_empty():
-		DLogger.warn("No SCXML path stored in metadata.", [], StateChartConstants.CAT, self)
+		_log.warn("No SCXML path stored in metadata.", [], "", self)
 		return
 	var importer := StateChartScxmlImporter.new()
 	importer.import_scxml(path, self)
@@ -801,7 +805,7 @@ func reimport_scxml() -> void:
 ## Manually check for configuration warnings.
 func check_errors() -> void:
 	if Engine.is_editor_hint():
-		DLogger.info("Checking configuration warnings...", [], StateChartConstants.CAT, self)
+		_log.info("Checking configuration warnings...", [], "", self)
 	_entries_cache.clear()
 	_update_all_warnings(self)
 	notify_property_list_changed()
@@ -829,16 +833,14 @@ func clear_all_metadata() -> void:
 				ur.commit_action()
 
 				if cleared_count > 0:
-					DLogger.info(
+					_log.info(
 						"Cleared {0} metadata entries across {1} nodes.",
 						[cleared_count, nodes.size()],
-						StateChartConstants.CAT,
+						"",
 						self
 					)
 				else:
-					DLogger.info(
-						"No metadata entries found to clear.", [], StateChartConstants.CAT, self
-					)
+					_log.info("No metadata entries found to clear.", [], "", self)
 				return
 
 	# Fallback for runtime execution or when editor undo/redo is not available
@@ -848,14 +850,14 @@ func clear_all_metadata() -> void:
 			cleared_count += 1
 
 	if cleared_count > 0:
-		DLogger.info(
+		_log.info(
 			"Cleared {0} metadata entries across {1} nodes.",
 			[cleared_count, nodes.size()],
-			StateChartConstants.CAT,
+			"",
 			self
 		)
 	else:
-		DLogger.info("No metadata entries found to clear.", [], StateChartConstants.CAT, self)
+		_log.info("No metadata entries found to clear.", [], "", self)
 
 
 ## Function to use instead of set_expression_property when setting parameters.
@@ -868,12 +870,7 @@ func set_expression_property_ext(
 
 	if debug_log:
 		var prev_str := "None" if prev is NoneValue else str(prev)
-		DLogger.debug(
-			"Param '{0}' changed: {1} -> {2}",
-			[param_name, prev_str, value],
-			StateChartConstants.CAT,
-			self
-		)
+		_log.debug("Param '{0}' changed: {1} -> {2}", [param_name, prev_str, value], "", self)
 
 	var can_call_base := is_instance_valid(_state)
 
@@ -909,10 +906,10 @@ func set_expression_property_local(
 			set_expression_property_ext(param_ent, value, suppress_notify)
 			return
 
-		DLogger.error(
+		_log.error(
 			"set_expression_property_local: No active state context. {0}",
 			[param_ent.name],
-			StateChartConstants.CAT,
+			"",
 			self
 		)
 		return
@@ -941,10 +938,10 @@ func get_expression_property_ext(param_ent: ParamEnt, default_val: Variant = nul
 ## Function to use instead of send_event when dispatching events.
 func send_event_ext(event_ent: EventEnt) -> void:
 	if not _any_state_entered:
-		DLogger.warn(
+		_log.warn(
 			"Event '{0}' sent before any state was entered. This event will likely be lost",
 			[event_ent.name],
-			StateChartConstants.CAT,
+			"",
 			self
 		)
 	if is_instance_valid(_state):
