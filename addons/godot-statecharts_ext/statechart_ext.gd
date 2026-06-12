@@ -235,6 +235,7 @@ static var _entries_cache: Dictionary = {}
 	set(value):
 		runtime_visualization = value
 		_update_debug_log_connections(self)
+		_update_visualization()
 
 ## Exception list for unused event warnings
 @export var exclude_unused_event: Array[StringName] = []:
@@ -266,6 +267,10 @@ var _e_dyn: EventProxy
 var _p_dyn: ParamProxy
 ## History of state transitions (runtime only)
 var _runtime_history: Array[String] = []
+## Internal: Canvas for runtime visualization
+var _visualizer_canvas: CanvasLayer
+## Internal: Label for runtime visualization
+var _visualizer_label: Label
 
 
 # ------------- [Callbacks] -------------
@@ -289,6 +294,11 @@ func _enter_tree() -> void:
 	if Engine.is_editor_hint():
 		return
 	_connect_state_signals_early(self)
+
+
+func _exit_tree() -> void:
+	if is_in_group("statechart_ext_active_visualizers"):
+		remove_from_group("statechart_ext_active_visualizers")
 
 
 func _ready() -> void:
@@ -339,22 +349,18 @@ func _on_state_entered(state: Node) -> void:
 	var msg := "Entered: {0}".format([state.name])
 	if debug_log:
 		DLogger.debug("State entered (Post): {0}", [state.name], StateChartConstants.CAT, self)
-	if runtime_visualization:
-		state.set_meta("statechart_ext_original_name", state.name)
-		state.name = "▶ " + state.name
-
+	
 	_add_history(msg)
+	_update_visualization()
 
 
 func _on_state_exited(state: Node) -> void:
 	var msg := "Exited: {0}".format([state.name])
 	if debug_log:
 		DLogger.debug("State exited (Post): {0}", [state.name], StateChartConstants.CAT, self)
-	if runtime_visualization:
-		if state.has_meta("statechart_ext_original_name"):
-			state.name = state.get_meta("statechart_ext_original_name")
 
 	_add_history(msg)
+	_update_visualization()
 
 
 func _add_history(msg: String) -> void:
@@ -582,7 +588,7 @@ static func _check_parameter_type(
 
 func _make_zero(type: int) -> Variant:
 	if type == TYPE_STRING:
-		return "KUSOGE!"
+		return ""
 	return type_convert(null, type)
 
 
@@ -713,6 +719,53 @@ func _collect_nodes_recursive(node: Node, list: Array[Node]) -> void:
 	list.append(node)
 	for child in node.get_children():
 		_collect_nodes_recursive(child, list)
+
+
+func _update_visualization() -> void:
+	if Engine.is_editor_hint() or not is_inside_tree():
+		return
+
+	if not runtime_visualization:
+		if _visualizer_canvas:
+			_visualizer_canvas.queue_free()
+			_visualizer_canvas = null
+			_visualizer_label = null
+		return
+
+	if _visualizer_canvas == null:
+		_visualizer_canvas = CanvasLayer.new()
+		_visualizer_canvas.layer = 128  # High layer to stay on top
+		add_child(_visualizer_canvas)
+
+		_visualizer_label = Label.new()
+		_visualizer_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT, Control.PRESET_MODE_MINSIZE, 10)
+		_visualizer_label.add_theme_color_override("font_color", Color.YELLOW)
+		_visualizer_label.add_theme_font_size_override("font_size", 14)
+		
+		# Background
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color(0, 0, 0, 0.4)
+		style.content_margin_left = 5
+		style.content_margin_right = 5
+		_visualizer_label.add_theme_stylebox_override("normal", style)
+		
+		_visualizer_canvas.add_child(_visualizer_label)
+
+	var active_names: Array[String] = []
+	for state in _context_state_stack:
+		if is_instance_valid(state) and state.active:
+			active_names.append(state.name)
+
+	_visualizer_label.text = "[{0}] {1}".format([name, " > ".join(active_names)])
+	
+	# Adjust position if multiple StateChartExt are present
+	var sc_ext_nodes := get_tree().get_nodes_in_group("statechart_ext_active_visualizers")
+	if not is_in_group("statechart_ext_active_visualizers"):
+		add_to_group("statechart_ext_active_visualizers")
+		sc_ext_nodes.append(self)
+	
+	var index := sc_ext_nodes.find(self)
+	_visualizer_label.position.y = 10 + (index * 25)
 
 
 # ------------- [Public Method] -------------

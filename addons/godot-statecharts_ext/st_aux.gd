@@ -73,6 +73,12 @@ static func dispatch_event(st: StateChartExt, ev: StateChartExt.EventEnt) -> voi
 	st.send_event_ext(ev)
 
 
+## Returns all current expression properties as a dictionary.
+## Useful for saving game state or debugging.
+static func st_get_all_params_as_dict(st: StateChartExt) -> Dictionary:
+	return st._expression_properties.duplicate()
+
+
 ## Splits a command-line string into arguments, respecting quotes and escaped characters.
 static func split_args(flags: String) -> PackedStringArray:
 	var result: PackedStringArray = []
