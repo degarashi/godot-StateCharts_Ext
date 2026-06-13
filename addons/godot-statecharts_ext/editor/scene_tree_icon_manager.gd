@@ -157,14 +157,15 @@ func _on_tree_button_clicked(
 	if signal_name == "":
 		return
 
-	var conns := node.get_signal_connection_list(signal_name)
+	var conns := _get_user_connections(node, signal_name)
 	if conns.is_empty():
 		return
 
 	# Jump to the first connection target
-	var conn = conns[0]
-	var target = conn["callable"].get_object()
-	var method = conn["callable"].get_method()
+	var conn := conns[0]
+	var callable: Callable = conn["callable"]
+	var target: Object = callable.get_object()
+	var method: StringName = callable.get_method()
 
 	if target is Node:
 		var script: Script = target.get_script()
@@ -262,31 +263,12 @@ func _process_item_recursive(item: TreeItem) -> void:
 
 
 func _update_item_icons(item: TreeItem, node: Node) -> void:
-	var sigs := [
-		"event_received",
-		"state_entered",
-		"state_exited",
-		"state_processing",
-		"state_physics_processing"
-	]
-	var candidate := false
-	for s in sigs:
-		if node.has_signal(s):
-			candidate = true
-			break
-
-	if not candidate:
-		return
-
-	# DLogger.debug("Found Candidate: {0}", [node.name], "st_icon")
-
-	# Clear
+	# 既存の拡張アイコンをクリア
 	for i in range(item.get_button_count(0) - 1, -1, -1):
 		var id := item.get_button_id(0, i)
 		if id >= BUTTON_ID_BASE and id <= BUTTON_ID_PHYSICS:
 			item.erase_button(0, i)
 
-	var added := 0
 	var sig_config := {
 		"event_received": [BUTTON_ID_EVENT, _icons[BUTTON_ID_EVENT]],
 		"state_entered": [BUTTON_ID_ENTERED, _icons[BUTTON_ID_ENTERED]],
@@ -297,7 +279,7 @@ func _update_item_icons(item: TreeItem, node: Node) -> void:
 
 	for s: String in sig_config:
 		if node.has_signal(s):
-			var conns := node.get_signal_connection_list(s)
+			var conns := _get_user_connections(node, s)
 			if conns.size() > 0:
 				var cfg: Array = sig_config[s]
 				var tex = cfg[1]
@@ -305,9 +287,37 @@ func _update_item_icons(item: TreeItem, node: Node) -> void:
 					var method_name: String = conns[0]["callable"].get_method()
 					var tooltip := "{0} is connected\nClick to jump to [ {1} ]".format([s, method_name])
 					item.add_button(0, tex, cfg[0], false, tooltip)
-					added += 1
 				else:
 					DLogger.warn("Icon for {0} is not a valid Texture2D", [s], "st_icon")
+
+
+func _get_user_connections(node: Node, signal_name: String) -> Array[Dictionary]:
+	var user_conns: Array[Dictionary] = []
+	if not node.has_signal(signal_name):
+		return user_conns
+
+	var conns := node.get_signal_connection_list(signal_name)
+	for conn: Dictionary in conns:
+		var callable: Callable = conn["callable"]
+		var target: Object = callable.get_object()
+		var method: StringName = callable.get_method()
+
+		var is_internal := false
+		if target is StateChartExt:
+			if method in [
+				"_on_state_entered_context",
+				"_on_state_entered_actions",
+				"_on_state_exited_cleanup",
+				"_on_state_exited_actions",
+				"_on_state_entered",
+				"_on_state_exited"
+			]:
+				is_internal = true
+
+		if not is_internal:
+			user_conns.append(conn)
+
+	return user_conns
 
 
 func cleanup() -> void:
