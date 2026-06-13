@@ -19,20 +19,30 @@ var _is_cleaning_up := false
 func _init(plugin: EditorPlugin) -> void:
 	_plugin = plugin
 
-	_icons[BUTTON_ID_EVENT] = preload("res://addons/godot-statecharts_ext/icons/icon_on_event_received.svg")
-	_icons[BUTTON_ID_ENTERED] = preload("res://addons/godot-statecharts_ext/icons/icon_on_state_entered.svg")
-	_icons[BUTTON_ID_EXITED] = preload("res://addons/godot-statecharts_ext/icons/icon_on_state_exited.svg")
-	_icons[BUTTON_ID_PROCESSING] = preload("res://addons/godot-statecharts_ext/icons/icon_on_state_processing.svg")
-	_icons[BUTTON_ID_PHYSICS] = preload("res://addons/godot-statecharts_ext/icons/icon_on_physics_state_processing.svg")
+	_icons[BUTTON_ID_EVENT] = preload(
+		"res://addons/godot-statecharts_ext/icons/icon_on_event_received.svg"
+	)
+	_icons[BUTTON_ID_ENTERED] = preload(
+		"res://addons/godot-statecharts_ext/icons/icon_on_state_entered.svg"
+	)
+	_icons[BUTTON_ID_EXITED] = preload(
+		"res://addons/godot-statecharts_ext/icons/icon_on_state_exited.svg"
+	)
+	_icons[BUTTON_ID_PROCESSING] = preload(
+		"res://addons/godot-statecharts_ext/icons/icon_on_state_processing.svg"
+	)
+	_icons[BUTTON_ID_PHYSICS] = preload(
+		"res://addons/godot-statecharts_ext/icons/icon_on_physics_state_processing.svg"
+	)
 
 	DLogger.debug("SceneTreeIconManager initialized.", [], "st_icon")
 	_find_tree()
-	
+
 	_plugin.scene_changed.connect(func(_root): update_icons())
 	_plugin.scene_closed.connect(func(_path): update_icons())
 	_plugin.main_screen_changed.connect(func(_screen): update_icons())
 	EditorInterface.get_selection().selection_changed.connect(update_icons)
-	
+
 	_start_periodic_refresh()
 
 
@@ -51,39 +61,48 @@ func _on_refresh_timeout() -> void:
 
 func _find_tree() -> void:
 	var base := EditorInterface.get_base_control()
-	if not base: return
+	if not base:
+		return
 
 	var all_trees: Array[Tree] = []
 	_gather_all_trees(base, all_trees)
-	
+
 	var best_cand: Tree = null
 	var best_score := -1
-	
+
 	for t in all_trees:
-		if not is_instance_valid(t): continue
+		if not is_instance_valid(t):
+			continue
 		var p = t.get_parent()
-		if not p or p.get_class() != "SceneTreeEditor": continue
-			
+		if not p or p.get_class() != "SceneTreeEditor":
+			continue
+
 		var score := 0
 		var path := _get_node_path_simple(t)
-		if t.get_root() != null: score += 100
-		if "/Scene/" in path: score += 50
-		if "Animation" in path or "Dialog" in path: score -= 80
-			
+		if t.get_root() != null:
+			score += 100
+		if "/Scene/" in path:
+			score += 50
+		if "Animation" in path or "Dialog" in path:
+			score -= 80
+
 		if score > best_score:
 			best_score = score
 			best_cand = t
-	
+
 	if best_cand:
 		if _tree != best_cand or best_score > _last_best_score:
 			_tree = best_cand
 			_last_best_score = best_score
-			DLogger.info("Tree identified: {0} (Score: {1}, Root: {2})", 
-				[_get_node_path_simple(_tree), best_score, (_tree.get_root() != null)], "st_icon")
-				
+			DLogger.info(
+				"Tree identified: {0} (Score: {1}, Root: {2})",
+				[_get_node_path_simple(_tree), best_score, _tree.get_root() != null],
+				"st_icon"
+			)
+
 			if not _tree.is_connected("gui_input", _on_tree_gui_input):
 				_tree.gui_input.connect(_on_tree_gui_input)
-			
+
 			if not _tree.is_connected("button_clicked", _on_tree_button_clicked):
 				_tree.button_clicked.connect(_on_tree_button_clicked)
 	else:
@@ -92,8 +111,10 @@ func _find_tree() -> void:
 
 
 func _gather_all_trees(node: Node, list: Array[Tree]) -> void:
-	if node is Tree: list.append(node)
-	for child in node.get_children(): _gather_all_trees(child, list)
+	if node is Tree:
+		list.append(node)
+	for child in node.get_children():
+		_gather_all_trees(child, list)
 
 
 func _get_node_path_simple(node: Node) -> String:
@@ -110,31 +131,41 @@ func _on_tree_gui_input(event: InputEvent) -> void:
 		update_icons()
 
 
-func _on_tree_button_clicked(item: TreeItem, _column: int, id: int, _mouse_button_index: int) -> void:
+func _on_tree_button_clicked(
+	item: TreeItem, _column: int, id: int, _mouse_button_index: int
+) -> void:
 	if id < BUTTON_ID_BASE or id > BUTTON_ID_PHYSICS:
 		return
-	
+
 	var node := _get_node_from_item(item)
-	if not node: return
-	
+	if not node:
+		return
+
 	var signal_name := ""
 	match id:
-		BUTTON_ID_EVENT: signal_name = "event_received"
-		BUTTON_ID_ENTERED: signal_name = "state_entered"
-		BUTTON_ID_EXITED: signal_name = "state_exited"
-		BUTTON_ID_PROCESSING: signal_name = "state_processing"
-		BUTTON_ID_PHYSICS: signal_name = "state_physics_processing"
-	
-	if signal_name == "": return
-	
+		BUTTON_ID_EVENT:
+			signal_name = "event_received"
+		BUTTON_ID_ENTERED:
+			signal_name = "state_entered"
+		BUTTON_ID_EXITED:
+			signal_name = "state_exited"
+		BUTTON_ID_PROCESSING:
+			signal_name = "state_processing"
+		BUTTON_ID_PHYSICS:
+			signal_name = "state_physics_processing"
+
+	if signal_name == "":
+		return
+
 	var conns := node.get_signal_connection_list(signal_name)
-	if conns.is_empty(): return
-	
+	if conns.is_empty():
+		return
+
 	# Jump to the first connection target
 	var conn = conns[0]
 	var target = conn["callable"].get_object()
 	var method = conn["callable"].get_method()
-	
+
 	if target is Node:
 		var script: Script = target.get_script()
 		if script:
@@ -145,14 +176,18 @@ func _on_tree_button_clicked(item: TreeItem, _column: int, id: int, _mouse_butto
 func _get_node_from_item(item: TreeItem) -> Node:
 	for i in range(2):
 		var m = item.get_metadata(i)
-		if m == null: continue
-		if m is Node: return m
-		if m is int: return instance_from_id(m) as Node
+		if m == null:
+			continue
+		if m is Node:
+			return m
+		if m is int:
+			return instance_from_id(m) as Node
 		if m is String or m is NodePath:
 			var scene_root = EditorInterface.get_edited_scene_root()
 			if scene_root:
 				var n = scene_root.get_node_or_null(m)
-				if n: return n
+				if n:
+					return n
 	return null
 
 
@@ -166,7 +201,11 @@ func _find_method_line(script: Script, method_name: String) -> int:
 		if line_text.begins_with(pattern):
 			# Double check it's not a substring of another function
 			var after_pattern = line_text.substr(pattern.length()).strip_edges()
-			if after_pattern == "" or after_pattern.begins_with("(") or after_pattern.begins_with(":"):
+			if (
+				after_pattern == ""
+				or after_pattern.begins_with("(")
+				or after_pattern.begins_with(":")
+			):
 				return i + 1
 	return -1
 
@@ -182,19 +221,21 @@ func update_icons() -> void:
 		return
 
 	var root: TreeItem = _tree.get_root()
-	if not root: return
+	if not root:
+		return
 
 	_process_item_recursive(root)
 
 
 func _process_item_recursive(item: TreeItem) -> void:
 	var node: Node = null
-	
+
 	# Try all indices and various retrieval methods
 	for i in range(2):
 		var m = item.get_metadata(i)
-		if m == null: continue
-		
+		if m == null:
+			continue
+
 		if m is Node:
 			node = m
 		elif m is int:
@@ -204,12 +245,13 @@ func _process_item_recursive(item: TreeItem) -> void:
 			var scene_root = EditorInterface.get_edited_scene_root()
 			if scene_root:
 				node = scene_root.get_node_or_null(m)
-		
-		if node: break
-	
-	# If still no node, but we have text, it might be a SceneTree item we don't know how to decode yet
-	# DLogger.debug("Item: {0}, NodeFound: {1}, Meta0: {2}", [item.get_text(0), (node != null), type_string(typeof(item.get_metadata(0)))], "st_icon")
 
+		if node:
+			break
+
+	# If still no node, but we have text, it might be a SceneTree item we don't know how to decode yet
+	# DLogger.debug("Item: {0}, NodeFound: {1}, Meta0: {2}", [item.get_text(0), (node != null),
+	# type_string(typeof(item.get_metadata(0)))], "st_icon")
 	if node:
 		_update_item_icons(item, node)
 
@@ -220,14 +262,21 @@ func _process_item_recursive(item: TreeItem) -> void:
 
 
 func _update_item_icons(item: TreeItem, node: Node) -> void:
-	var sigs := ["event_received", "state_entered", "state_exited", "state_processing", "state_physics_processing"]
+	var sigs := [
+		"event_received",
+		"state_entered",
+		"state_exited",
+		"state_processing",
+		"state_physics_processing"
+	]
 	var candidate := false
 	for s in sigs:
 		if node.has_signal(s):
 			candidate = true
 			break
-	
-	if not candidate: return
+
+	if not candidate:
+		return
 
 	# DLogger.debug("Found Candidate: {0}", [node.name], "st_icon")
 
@@ -245,15 +294,17 @@ func _update_item_icons(item: TreeItem, node: Node) -> void:
 		"state_processing": [BUTTON_ID_PROCESSING, _icons[BUTTON_ID_PROCESSING]],
 		"state_physics_processing": [BUTTON_ID_PHYSICS, _icons[BUTTON_ID_PHYSICS]]
 	}
-	
-	for s in sig_config:
+
+	for s: String in sig_config:
 		if node.has_signal(s):
 			var conns := node.get_signal_connection_list(s)
 			if conns.size() > 0:
 				var cfg: Array = sig_config[s]
 				var tex = cfg[1]
 				if tex is Texture2D:
-					item.add_button(0, tex, cfg[0], false, s + " is connected")
+					var method_name: String = conns[0]["callable"].get_method()
+					var tooltip := "{0} is connected\nClick to jump to [ {1} ]".format([s, method_name])
+					item.add_button(0, tex, cfg[0], false, tooltip)
 					added += 1
 				else:
 					DLogger.warn("Icon for {0} is not a valid Texture2D", [s], "st_icon")
@@ -267,10 +318,10 @@ func cleanup() -> void:
 
 	if EditorInterface.get_selection().selection_changed.is_connected(update_icons):
 		EditorInterface.get_selection().selection_changed.disconnect(update_icons)
-	
+
 	if is_instance_valid(_tree) and _tree.gui_input.is_connected(_on_tree_gui_input):
 		_tree.gui_input.disconnect(_on_tree_gui_input)
-	
+
 	if is_instance_valid(_tree) and _tree.button_clicked.is_connected(_on_tree_button_clicked):
 		_tree.button_clicked.disconnect(_on_tree_button_clicked)
 
@@ -279,7 +330,8 @@ func cleanup() -> void:
 
 
 func _remove_buttons_recursive(item: TreeItem) -> void:
-	if not item: return
+	if not item:
+		return
 	for i in range(item.get_button_count(0) - 1, -1, -1):
 		var id: int = item.get_button_id(0, i)
 		if id >= BUTTON_ID_BASE and id <= BUTTON_ID_PHYSICS:
