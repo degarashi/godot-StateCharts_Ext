@@ -83,6 +83,9 @@ func _find_tree() -> void:
 				
 			if not _tree.is_connected("gui_input", _on_tree_gui_input):
 				_tree.gui_input.connect(_on_tree_gui_input)
+			
+			if not _tree.is_connected("button_clicked", _on_tree_button_clicked):
+				_tree.button_clicked.connect(_on_tree_button_clicked)
 	else:
 		_tree = null
 		_last_best_score = -1
@@ -105,6 +108,67 @@ func _get_node_path_simple(node: Node) -> String:
 func _on_tree_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed:
 		update_icons()
+
+
+func _on_tree_button_clicked(item: TreeItem, _column: int, id: int, _mouse_button_index: int) -> void:
+	if id < BUTTON_ID_BASE or id > BUTTON_ID_PHYSICS:
+		return
+	
+	var node := _get_node_from_item(item)
+	if not node: return
+	
+	var signal_name := ""
+	match id:
+		BUTTON_ID_EVENT: signal_name = "event_received"
+		BUTTON_ID_ENTERED: signal_name = "state_entered"
+		BUTTON_ID_EXITED: signal_name = "state_exited"
+		BUTTON_ID_PROCESSING: signal_name = "state_processing"
+		BUTTON_ID_PHYSICS: signal_name = "state_physics_processing"
+	
+	if signal_name == "": return
+	
+	var conns := node.get_signal_connection_list(signal_name)
+	if conns.is_empty(): return
+	
+	# Jump to the first connection target
+	var conn = conns[0]
+	var target = conn["callable"].get_object()
+	var method = conn["callable"].get_method()
+	
+	if target is Node:
+		var script: Script = target.get_script()
+		if script:
+			var line := _find_method_line(script, method)
+			EditorInterface.edit_script(script, line)
+
+
+func _get_node_from_item(item: TreeItem) -> Node:
+	for i in range(2):
+		var m = item.get_metadata(i)
+		if m == null: continue
+		if m is Node: return m
+		if m is int: return instance_from_id(m) as Node
+		if m is String or m is NodePath:
+			var scene_root = EditorInterface.get_edited_scene_root()
+			if scene_root:
+				var n = scene_root.get_node_or_null(m)
+				if n: return n
+	return null
+
+
+func _find_method_line(script: Script, method_name: String) -> int:
+	var code := script.get_source_code()
+	var lines := code.split("\n")
+	# Basic search for "func method_name"
+	var pattern := "func " + method_name
+	for i in range(lines.size()):
+		var line_text := lines[i].strip_edges()
+		if line_text.begins_with(pattern):
+			# Double check it's not a substring of another function
+			var after_pattern = line_text.substr(pattern.length()).strip_edges()
+			if after_pattern == "" or after_pattern.begins_with("(") or after_pattern.begins_with(":"):
+				return i + 1
+	return -1
 
 
 func update_icons() -> void:
@@ -206,6 +270,9 @@ func cleanup() -> void:
 	
 	if is_instance_valid(_tree) and _tree.gui_input.is_connected(_on_tree_gui_input):
 		_tree.gui_input.disconnect(_on_tree_gui_input)
+	
+	if is_instance_valid(_tree) and _tree.button_clicked.is_connected(_on_tree_button_clicked):
+		_tree.button_clicked.disconnect(_on_tree_button_clicked)
 
 	if is_instance_valid(_tree):
 		_remove_buttons_recursive(_tree.get_root())
