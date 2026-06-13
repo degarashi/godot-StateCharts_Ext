@@ -32,8 +32,48 @@ static func get_warnings(sc: StateChartExt) -> PackedStringArray:
 		_check_unused_events(warnings, sc, event, exclude_ev)
 
 	_check_transition_overlap(warnings, sc)
+	_check_parallel_transitions(warnings, sc)
 
 	return warnings
+
+
+static func _check_parallel_transitions(err_msg: PackedStringArray, sc: StateChartExt) -> void:
+	_check_parallel_transitions_internal(err_msg, sc, "")
+
+
+static func _check_parallel_transitions_internal(
+	err_msg: PackedStringArray, node: Node, path: String
+) -> void:
+	if node is ParallelState:
+		for region in node.get_children():
+			if not region is StateChartState:
+				continue
+			_check_illegal_exits(err_msg, region, node, region, path + StateChartConstants.PATH_SEPARATOR + region.name)
+
+	for c in node.get_children():
+		if not c is Transition:
+			var child_path := path + StateChartConstants.PATH_SEPARATOR + c.name
+			_check_parallel_transitions_internal(err_msg, c, child_path)
+
+
+static func _check_illegal_exits(
+	err_msg: PackedStringArray, current_node: Node, parallel_root: Node, region_root: Node, path: String
+) -> void:
+	for c in current_node.get_children():
+		if c is Transition:
+			if c.to.is_empty():
+				continue
+			var target := c.get_node_or_null(c.to)
+			if target != null and parallel_root.is_ancestor_of(target):
+				if not region_root.is_ancestor_of(target) and target != region_root:
+					err_msg.append(
+						(
+							"Parallel state cross-transition detected at [{0}]: target '{1}' is in another region of parallel state '{2}'"
+							. format([path + StateChartConstants.PATH_SEPARATOR + c.name, target.name, parallel_root.name])
+						)
+					)
+		else:
+			_check_illegal_exits(err_msg, c, parallel_root, region_root, path + StateChartConstants.PATH_SEPARATOR + c.name)
 
 
 static func _check_transition_overlap(err_msg: PackedStringArray, sc: StateChartExt) -> void:
