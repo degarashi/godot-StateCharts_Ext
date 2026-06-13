@@ -13,6 +13,7 @@ var _tree: Tree
 var _icons: Dictionary = {}
 var _refresh_timer: SceneTreeTimer
 var _last_best_score := -1
+var _is_cleaning_up := false
 
 
 func _init(plugin: EditorPlugin) -> void:
@@ -36,7 +37,7 @@ func _init(plugin: EditorPlugin) -> void:
 
 
 func _start_periodic_refresh() -> void:
-	if _refresh_timer:
+	if _is_cleaning_up or _refresh_timer:
 		return
 	_refresh_timer = _plugin.get_tree().create_timer(2.0)
 	_refresh_timer.timeout.connect(_on_refresh_timeout)
@@ -195,8 +196,17 @@ func _update_item_icons(item: TreeItem, node: Node) -> void:
 
 
 func cleanup() -> void:
+	_is_cleaning_up = true
+	if _refresh_timer and _refresh_timer.timeout.is_connected(_on_refresh_timeout):
+		_refresh_timer.timeout.disconnect(_on_refresh_timeout)
+	_refresh_timer = null
+
 	if EditorInterface.get_selection().selection_changed.is_connected(update_icons):
 		EditorInterface.get_selection().selection_changed.disconnect(update_icons)
+	
+	if is_instance_valid(_tree) and _tree.gui_input.is_connected(_on_tree_gui_input):
+		_tree.gui_input.disconnect(_on_tree_gui_input)
+
 	if is_instance_valid(_tree):
 		_remove_buttons_recursive(_tree.get_root())
 
