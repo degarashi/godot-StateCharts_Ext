@@ -1,0 +1,213 @@
+@tool
+extends RefCounted
+
+const BUTTON_ID_BASE := 999600
+const BUTTON_ID_EVENT := BUTTON_ID_BASE + 1
+const BUTTON_ID_ENTERED := BUTTON_ID_BASE + 2
+const BUTTON_ID_EXITED := BUTTON_ID_BASE + 3
+const BUTTON_ID_PROCESSING := BUTTON_ID_BASE + 4
+const BUTTON_ID_PHYSICS := BUTTON_ID_BASE + 5
+
+var _plugin: EditorPlugin
+var _tree: Tree
+var _icons: Dictionary = {}
+var _refresh_timer: SceneTreeTimer
+var _last_best_score := -1
+
+
+func _init(plugin: EditorPlugin) -> void:
+	_plugin = plugin
+
+	_icons[BUTTON_ID_EVENT] = preload("res://addons/godot-statecharts_ext/icons/icon_on_event_received.svg")
+	_icons[BUTTON_ID_ENTERED] = preload("res://addons/godot-statecharts_ext/icons/icon_on_state_entered.svg")
+	_icons[BUTTON_ID_EXITED] = preload("res://addons/godot-statecharts_ext/icons/icon_on_state_exited.svg")
+	_icons[BUTTON_ID_PROCESSING] = preload("res://addons/godot-statecharts_ext/icons/icon_on_state_processing.svg")
+	_icons[BUTTON_ID_PHYSICS] = preload("res://addons/godot-statecharts_ext/icons/icon_on_physics_state_processing.svg")
+
+	DLogger.debug("SceneTreeIconManager initialized.", [], "st_icon")
+	_find_tree()
+	
+	_plugin.scene_changed.connect(func(_root): update_icons())
+	_plugin.scene_closed.connect(func(_path): update_icons())
+	_plugin.main_screen_changed.connect(func(_screen): update_icons())
+	EditorInterface.get_selection().selection_changed.connect(update_icons)
+	
+	_start_periodic_refresh()
+
+
+func _start_periodic_refresh() -> void:
+	if _refresh_timer:
+		return
+	_refresh_timer = _plugin.get_tree().create_timer(2.0)
+	_refresh_timer.timeout.connect(_on_refresh_timeout)
+
+
+func _on_refresh_timeout() -> void:
+	_refresh_timer = null
+	update_icons()
+	_start_periodic_refresh()
+
+
+func _find_tree() -> void:
+	var base := EditorInterface.get_base_control()
+	if not base: return
+
+	var all_trees: Array[Tree] = []
+	_gather_all_trees(base, all_trees)
+	
+	var best_cand: Tree = null
+	var best_score := -1
+	
+	for t in all_trees:
+		if not is_instance_valid(t): continue
+		var p = t.get_parent()
+		if not p or p.get_class() != "SceneTreeEditor": continue
+			
+		var score := 0
+		var path := _get_node_path_simple(t)
+		if t.get_root() != null: score += 100
+		if "/Scene/" in path: score += 50
+		if "Animation" in path or "Dialog" in path: score -= 80
+			
+		if score > best_score:
+			best_score = score
+			best_cand = t
+	
+	if best_cand:
+		if _tree != best_cand or best_score > _last_best_score:
+			_tree = best_cand
+			_last_best_score = best_score
+			DLogger.info("Tree identified: {0} (Score: {1}, Root: {2})", 
+				[_get_node_path_simple(_tree), best_score, (_tree.get_root() != null)], "st_icon")
+				
+			if not _tree.is_connected("gui_input", _on_tree_gui_input):
+				_tree.gui_input.connect(_on_tree_gui_input)
+	else:
+		_tree = null
+		_last_best_score = -1
+
+
+func _gather_all_trees(node: Node, list: Array[Tree]) -> void:
+	if node is Tree: list.append(node)
+	for child in node.get_children(): _gather_all_trees(child, list)
+
+
+func _get_node_path_simple(node: Node) -> String:
+	var p := node.name
+	var parent := node.get_parent()
+	while parent and parent != EditorInterface.get_base_control():
+		p = parent.name + "/" + p
+		parent = parent.get_parent()
+	return p
+
+
+func _on_tree_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed:
+		update_icons()
+
+
+func update_icons() -> void:
+	# Keep trying to find a better tree or wait for root
+	if not is_instance_valid(_tree) or _tree.get_root() == null:
+		_find_tree()
+		if not is_instance_valid(_tree) or _tree.get_root() == null:
+			return
+
+	if not _tree.is_visible_in_tree():
+		return
+
+	var root: TreeItem = _tree.get_root()
+	if not root: return
+
+	_process_item_recursive(root)
+
+
+func _process_item_recursive(item: TreeItem) -> void:
+	var node: Node = null
+	
+	# Try all indices and various retrieval methods
+	for i in range(2):
+		var m = item.get_metadata(i)
+		if m == null: continue
+		
+		if m is Node:
+			node = m
+		elif m is int:
+			node = instance_from_id(m) as Node
+		elif m is String or m is NodePath:
+			# Try to resolve path relative to edited scene root
+			var scene_root = EditorInterface.get_edited_scene_root()
+			if scene_root:
+				node = scene_root.get_node_or_null(m)
+		
+		if node: break
+	
+	# If still no node, but we have text, it might be a SceneTree item we don't know how to decode yet
+	# DLogger.debug("Item: {0}, NodeFound: {1}, Meta0: {2}", [item.get_text(0), (node != null), type_string(typeof(item.get_metadata(0)))], "st_icon")
+
+	if node:
+		_update_item_icons(item, node)
+
+	var child: TreeItem = item.get_first_child()
+	while child:
+		_process_item_recursive(child)
+		child = child.get_next()
+
+
+func _update_item_icons(item: TreeItem, node: Node) -> void:
+	var sigs := ["event_received", "state_entered", "state_exited", "state_processing", "state_physics_processing"]
+	var candidate := false
+	for s in sigs:
+		if node.has_signal(s):
+			candidate = true
+			break
+	
+	if not candidate: return
+
+	# DLogger.debug("Found Candidate: {0}", [node.name], "st_icon")
+
+	# Clear
+	for i in range(item.get_button_count(0) - 1, -1, -1):
+		var id := item.get_button_id(0, i)
+		if id >= BUTTON_ID_BASE and id <= BUTTON_ID_PHYSICS:
+			item.erase_button(0, i)
+
+	var added := 0
+	var sig_config := {
+		"event_received": [BUTTON_ID_EVENT, _icons[BUTTON_ID_EVENT]],
+		"state_entered": [BUTTON_ID_ENTERED, _icons[BUTTON_ID_ENTERED]],
+		"state_exited": [BUTTON_ID_EXITED, _icons[BUTTON_ID_EXITED]],
+		"state_processing": [BUTTON_ID_PROCESSING, _icons[BUTTON_ID_PROCESSING]],
+		"state_physics_processing": [BUTTON_ID_PHYSICS, _icons[BUTTON_ID_PHYSICS]]
+	}
+	
+	for s in sig_config:
+		if node.has_signal(s):
+			var conns := node.get_signal_connection_list(s)
+			if conns.size() > 0:
+				var cfg: Array = sig_config[s]
+				var tex = cfg[1]
+				if tex is Texture2D:
+					item.add_button(0, tex, cfg[0], false, s + " is connected")
+					added += 1
+				else:
+					DLogger.warn("Icon for {0} is not a valid Texture2D", [s], "st_icon")
+
+
+func cleanup() -> void:
+	if EditorInterface.get_selection().selection_changed.is_connected(update_icons):
+		EditorInterface.get_selection().selection_changed.disconnect(update_icons)
+	if is_instance_valid(_tree):
+		_remove_buttons_recursive(_tree.get_root())
+
+
+func _remove_buttons_recursive(item: TreeItem) -> void:
+	if not item: return
+	for i in range(item.get_button_count(0) - 1, -1, -1):
+		var id: int = item.get_button_id(0, i)
+		if id >= BUTTON_ID_BASE and id <= BUTTON_ID_PHYSICS:
+			item.erase_button(0, i)
+	var child: TreeItem = item.get_first_child()
+	while child:
+		_remove_buttons_recursive(child)
+		child = child.get_next()

@@ -31,6 +31,7 @@ var _context_menu_plugin: EditorContextMenuPlugin
 var _scene_tree_context_menu_plugin: EditorContextMenuPlugin
 var _editor_manager: StateChartEditorManager
 var _fs_icon_manager: RefCounted  # (FileSystemIconManager)
+var _st_icon_manager: RefCounted  # (SceneTreeIconManager)
 
 
 # ------------- [Lifecycle Methods] -------------
@@ -44,6 +45,11 @@ func _enter_tree() -> void:
 		"res://addons/godot-statecharts_ext/editor/file_system_icon_manager.gd"
 	)
 	_fs_icon_manager = FSIconManager.new(self)
+
+	var STIconManager := preload(
+		"res://addons/godot-statecharts_ext/editor/scene_tree_icon_manager.gd"
+	)
+	_st_icon_manager = STIconManager.new(self)
 
 	var DummyImportPlugin := preload("uid://b70108gychlte")
 	_import_plugin = DummyImportPlugin.new(
@@ -86,6 +92,10 @@ func _enter_tree() -> void:
 
 
 func _exit_tree() -> void:
+	if _st_icon_manager:
+		_st_icon_manager.cleanup()
+		_st_icon_manager = null
+
 	if _fs_icon_manager:
 		_fs_icon_manager.cleanup()
 		_fs_icon_manager = null
