@@ -263,6 +263,8 @@ var _any_state_entered := false
 var _context_state_stack: Array[StateChartState] = []
 ## Local parameters managed per state [StateChartState] -> Array[ParamEnt]
 var _state_local_params: Dictionary = {}
+## Optimized lookup for local parameters: [StringName] -> Array[ParamEnt]
+var _local_params_by_state_name: Dictionary[StringName, Array] = {}
 ## Internal: Dynamic event proxy
 var _e_dyn: EventProxy
 ## Internal: Dynamic parameter proxy
@@ -329,6 +331,12 @@ func _ready() -> void:
 						continue
 				if not initial_expression_properties.has(ent.name):
 					set_expression_property_ext(ent, init_val, true)
+			else:
+				# Pre-group local parameters by their target state name/path
+				var loc_state := ent.local_state
+				if not _local_params_by_state_name.has(loc_state):
+					_local_params_by_state_name[loc_state] = []
+				_local_params_by_state_name[loc_state].append(ent)
 
 		if get(&"e") == null:
 			set(&"e", DynamicEventProxy.new(self, sc_info.event))
@@ -453,28 +461,35 @@ func _on_state_entered_context(state: StateChartState) -> void:
 	if state not in _context_state_stack:
 		_context_state_stack.append(state)
 
-	var sc_info := get_sc_info()
-	if sc_info != null:
-		var params := _init_and_get_entries(sc_info.param, ParamEnt)
-		for p_name in params:
-			var ent := params[p_name] as ParamEnt
-			var is_match := false
-			if ent.local_state == state.name:
-				is_match = true
-			elif not ent.local_state.is_empty():
-				# Check relative path from this node to the state
-				var rel_path := str(get_path_to(state))
-				if (
-					rel_path == str(ent.local_state)
-					or rel_path.ends_with(StateChartConstants.PATH_SEPARATOR + str(ent.local_state))
-				):
-					is_match = true
+	if _local_params_by_state_name.is_empty():
+		return
 
-			if is_match:
-				var init_val: Variant = ent.initial_value
-				if init_val is NoneValue:
-					init_val = _make_zero(ent.type_id)
-				set_expression_property_local(ent, init_val, state, true)
+	# Fast lookup by state name
+	var state_name := StringName(state.name)
+	if _local_params_by_state_name.has(state_name):
+		for ent in _local_params_by_state_name[state_name]:
+			_init_local_param(ent, state)
+
+	# Check for full path matches if any
+	var state_path := str(get_path_to(state))
+	for loc_state in _local_params_by_state_name:
+		if loc_state == state_name:
+			continue  # Already handled above
+		
+		var loc_str := str(loc_state)
+		if (
+			state_path == loc_str
+			or state_path.ends_with(StateChartConstants.PATH_SEPARATOR + loc_str)
+		):
+			for ent in _local_params_by_state_name[loc_state]:
+				_init_local_param(ent, state)
+
+
+func _init_local_param(ent: ParamEnt, state: StateChartState) -> void:
+	var init_val: Variant = ent.initial_value
+	if init_val is NoneValue:
+		init_val = _make_zero(ent.type_id)
+	set_expression_property_local(ent, init_val, state, true)
 
 
 func _on_state_exited_cleanup(state: StateChartState) -> void:
