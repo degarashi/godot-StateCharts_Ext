@@ -322,7 +322,7 @@ func import_scxml(path: String, root_node: Node) -> Error:
 			for i in range(xml.get_attribute_count()):
 				var attr_name := xml.get_attribute_name(i)
 				if attr_name != "initial" and attr_name != "name" and attr_name != "version":
-					root_node.set_meta(_sanitize_meta_key(attr_name), xml.get_attribute_value(i))
+					root_node.set_meta(STAux.sanitize_meta_key(attr_name), xml.get_attribute_value(i))
 
 		elif node_name == "datamodel":
 			_parse_datamodel(xml, initial_properties)
@@ -446,7 +446,7 @@ func _parse_state_element(
 		if attr_name == UID_ATTR_NAME:
 			parsed.metadata[UID_META_KEY] = xml.get_attribute_value(i)
 		elif attr_name != "id" and attr_name != "name" and attr_name != "initial":
-			parsed.metadata[_sanitize_meta_key("attr:" + attr_name)] = xml.get_attribute_value(i)
+			parsed.metadata[STAux.sanitize_meta_key("attr:" + attr_name)] = xml.get_attribute_value(i)
 
 	if xml.is_empty():
 		return parsed
@@ -489,7 +489,7 @@ func _parse_state_element(
 								GUARD_JSON_ATTR_NAME
 							]
 						):
-							trans_meta[_sanitize_meta_key("attr:" + attr_name)] = (
+							trans_meta[STAux.sanitize_meta_key("attr:" + attr_name)] = (
 								xml.get_attribute_value(i)
 							)
 
@@ -511,7 +511,7 @@ func _parse_state_element(
 								XMLParser.NODE_ELEMENT:
 									var t_node_name := xml.get_node_name()
 									if t_node_name.contains(":"):
-										trans_meta[_sanitize_meta_key("tag:" + t_node_name)] = (_extract_element_metadata(
+										trans_meta[STAux.sanitize_meta_key("tag:" + t_node_name)] = (_extract_element_metadata(
 											xml
 										))
 								XMLParser.NODE_ELEMENT_END:
@@ -559,7 +559,7 @@ func _parse_state_element(
 
 				elif node_name.contains(":"):
 					# Likely foreign metadata (e.g. qt:editorinfo)
-					parsed.metadata[_sanitize_meta_key("tag:" + node_name)] = _extract_element_metadata(
+					parsed.metadata[STAux.sanitize_meta_key("tag:" + node_name)] = _extract_element_metadata(
 						xml
 					)
 
@@ -679,11 +679,8 @@ static func _sanitize_assign_expression(expr: String, params: Array[Dictionary])
 	return expr
 
 
-func _sanitize_meta_key(key: String) -> String:
-	return key.replace(":", "__")
-
-
 func _extract_element_metadata(xml: XMLParser) -> Dictionary:
+
 	var meta := {}
 	for i in range(xml.get_attribute_count()):
 		meta[xml.get_attribute_name(i)] = xml.get_attribute_value(i)
@@ -858,7 +855,7 @@ func _instantiate_state_tree(
 
 	if state_node is HistoryStateScript:
 		var h_state := state_node as HistoryState
-		var type_meta = parsed.metadata.get(_sanitize_meta_key("attr:type"), "shallow")
+		var type_meta = parsed.metadata.get(STAux.sanitize_meta_key("attr:type"), "shallow")
 		h_state.deep = (type_meta == "deep")
 
 	for child_parsed in parsed.children:

@@ -33,8 +33,101 @@ static func get_warnings(sc: StateChartExt) -> PackedStringArray:
 
 	_check_transition_overlap(warnings, sc)
 	_check_parallel_transitions(warnings, sc)
+	_check_duplicate_state_names(warnings, sc)
+
+	if not params_m.is_empty():
+		_check_unused_params(warnings, sc, params_m)
 
 	return warnings
+
+
+static func _check_duplicate_state_names(err_msg: PackedStringArray, sc: StateChartExt) -> void:
+	var state_names: Dictionary[String, int] = {}
+	_collect_state_names(sc, state_names)
+	
+	var duplicates: Array[String] = []
+	for name in state_names:
+		if state_names[name] > 1:
+			duplicates.append(name)
+	
+	if not duplicates.is_empty():
+		err_msg.append("Duplicate state names detected (can cause ambiguity in In() guards or local params): " + ", ".join(duplicates))
+
+
+static func _collect_state_names(node: Node, dst: Dictionary[String, int]) -> void:
+	if node is StateChartState:
+		var name := String(node.name)
+		dst[name] = dst.get(name, 0) + 1
+	
+	for c in node.get_children():
+		_collect_state_names(c, dst)
+
+
+static func _check_unused_params(
+	warnings: PackedStringArray, sc: StateChartExt, params: Dictionary[String, int]
+) -> void:
+	var used_params: Dictionary[String, bool] = {}
+	_collect_used_params(sc, used_params)
+	
+	var unused: Array[String] = []
+	for p_name in params:
+		if not used_params.has(p_name):
+			unused.append(p_name)
+	
+	if not unused.is_empty():
+		warnings.append("unused parameter(s):\n" + ", ".join(unused))
+
+
+static func _collect_used_params(node: Node, dst: Dictionary[String, bool]) -> void:
+	for c in node.get_children():
+		if c is Transition:
+			_extract_params_from_guard(c.guard, dst)
+		
+		# Also check metadata for onentry/onexit actions
+		for action_type: String in ["onentry", "onexit"]:
+			var meta_key: String = "statechart_ext__" + action_type
+			if c.has_meta(meta_key):
+				var actions = c.get_meta(meta_key)
+				if actions is Array:
+					for action in actions:
+						if action is Dictionary:
+							if action.get("type") == "assign":
+								var loc = action.get("location", "")
+								if not loc.is_empty():
+									dst[loc] = true
+								_extract_params_from_expr(action.get("expr", ""), dst)
+							elif action.get("type") == "send":
+								for p in action.get("params", []):
+									if p is Dictionary:
+										var p_name = p.get("name", "")
+										if not p_name.is_empty():
+											dst[p_name] = true
+										_extract_params_from_expr(p.get("expr", ""), dst)
+		
+		_collect_used_params(c, dst)
+
+
+static func _extract_params_from_guard(g: Guard, dst: Dictionary[String, bool]) -> void:
+	if g is ExpressionGuard:
+		_extract_params_from_expr(g.expression, dst)
+	elif g is NotGuard:
+		_extract_params_from_guard(g.guard, dst)
+	elif g is AllOfGuard or g is AnyOfGuard:
+		for cg in g.guards:
+			_extract_params_from_guard(cg, dst)
+
+
+static func _extract_params_from_expr(expr_str: String, dst: Dictionary[String, bool]) -> void:
+	if expr_str.is_empty():
+		return
+	# Basic regex to find identifiers. Might have some false positives with strings, 
+	# but it's better than nothing for an "unused" check.
+	var regex := RegEx.new()
+	regex.compile("\\b[a-zA-Z_][a-zA-Z0-9_]*\\b")
+	for m in regex.search_all(expr_str):
+		var id := m.get_string()
+		if id not in ["true", "false", "null", "In", "not", "and", "or"]:
+			dst[id] = true
 
 
 static func _check_parallel_transitions(err_msg: PackedStringArray, sc: StateChartExt) -> void:

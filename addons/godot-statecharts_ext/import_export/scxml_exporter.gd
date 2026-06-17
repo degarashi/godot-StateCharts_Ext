@@ -80,11 +80,11 @@ func _collect_used_prefixes(node: Node, dst: Dictionary[String, bool]) -> void:
 	for meta_key in node.get_meta_list():
 		var parts: PackedStringArray
 		if meta_key.begins_with("attr__"):
-			parts = _desanitize_meta_key(meta_key.substr(6)).split(":")
+			parts = STAux.desanitize_meta_key(meta_key.substr(6)).split(":")
 		elif meta_key.begins_with("tag__"):
-			parts = _desanitize_meta_key(meta_key.substr(5)).split(":")
+			parts = STAux.desanitize_meta_key(meta_key.substr(5)).split(":")
 		elif meta_key.contains("__"):
-			parts = _desanitize_meta_key(meta_key).split(":")
+			parts = STAux.desanitize_meta_key(meta_key).split(":")
 
 		if parts.size() == 2 and parts[0] != "xmlns":
 			dst[parts[0]] = true
@@ -194,14 +194,14 @@ func _export_state(node: Node, lines: Array[String], indent: int) -> void:
 				state_attrs.append(
 					'{0}="{1}"'.format(
 						[
-							_desanitize_meta_key(meta_key.substr(6)),
+							STAux.desanitize_meta_key(meta_key.substr(6)),
 							_escape_attr(str(node.get_meta(meta_key)))
 						]
 					)
 				)
 			elif meta_key.begins_with("tag__"):
 				var tag_info: Dictionary = node.get_meta(meta_key)
-				var tag_full_name := _desanitize_meta_key(meta_key.substr(5))
+				var tag_full_name := STAux.desanitize_meta_key(meta_key.substr(5))
 				var tag_attrs: Array[String] = []
 				for k in tag_info:
 					tag_attrs.append('{0}="{1}"'.format([k, _escape_attr(str(tag_info[k]))]))
@@ -332,10 +332,10 @@ func _export_transitions(state_node: Node, lines: Array[String], indent: int) ->
 		var extra_tags: Array[String] = []
 		for meta_key in t.get_meta_list():
 			if meta_key.begins_with("attr__"):
-				attrs[_desanitize_meta_key(meta_key.substr(6))] = str(t.get_meta(meta_key))
+				attrs[STAux.desanitize_meta_key(meta_key.substr(6))] = str(t.get_meta(meta_key))
 			elif meta_key.begins_with("tag__"):
 				var tag_info: Dictionary = t.get_meta(meta_key)
-				var tag_full_name := _desanitize_meta_key(meta_key.substr(5))
+				var tag_full_name := STAux.desanitize_meta_key(meta_key.substr(5))
 				var tag_attrs: Array[String] = []
 				for k in tag_info:
 					tag_attrs.append('{0}="{1}"'.format([k, _escape_attr(str(tag_info[k]))]))
@@ -513,10 +513,6 @@ func _escape_attr(value: String) -> String:
 	)
 
 
-func _desanitize_meta_key(key: String) -> String:
-	return key.replace("__", ":")
-
-
 # ------------- [Public Method] -------------
 ## Exports the state chart to an SCXML string
 func export_to_scxml(node: Node) -> String:
@@ -556,7 +552,7 @@ func export_to_scxml(node: Node) -> String:
 	var root_attrs: Array[String] = []
 	for meta_key in node.get_meta_list():
 		if meta_key.contains("__"):
-			var desanitized_key := _desanitize_meta_key(meta_key)
+			var desanitized_key := STAux.desanitize_meta_key(meta_key)
 			var parts := desanitized_key.split(":")
 
 			# If it's a namespace declaration, add to namespaces dict to avoid duplicates

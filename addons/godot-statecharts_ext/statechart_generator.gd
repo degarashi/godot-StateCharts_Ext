@@ -4,80 +4,6 @@
 class_name StateChartGenerator
 extends RefCounted
 
-# ------------- [Constants] -------------
-## Map from scdef type names to Godot TYPE_ constant names
-const TYPE_MAP: Dictionary[String, String] = {
-	"float": "TYPE_FLOAT",
-	"int": "TYPE_INT",
-	"bool": "TYPE_BOOL",
-	"string": "TYPE_STRING",
-	"vector2": "TYPE_VECTOR2",
-	"vector2i": "TYPE_VECTOR2I",
-	"vector3": "TYPE_VECTOR3",
-	"vector3i": "TYPE_VECTOR3I",
-	"vector4": "TYPE_VECTOR4",
-	"vector4i": "TYPE_VECTOR4I",
-	"rect2": "TYPE_RECT2",
-	"rect2i": "TYPE_RECT2I",
-	"plane": "TYPE_PLANE",
-	"quaternion": "TYPE_QUATERNION",
-	"aabb": "TYPE_AABB",
-	"basis": "TYPE_BASIS",
-	"transform2d": "TYPE_TRANSFORM2D",
-	"transform3d": "TYPE_TRANSFORM3D",
-	"projection": "TYPE_PROJECTION",
-	"color": "TYPE_COLOR",
-	"stringname": "TYPE_STRING_NAME",
-	"nodepath": "TYPE_NODE_PATH",
-	"rid": "TYPE_RID",
-	"object": "TYPE_OBJECT",
-	"node": "TYPE_OBJECT",
-	"resource": "TYPE_OBJECT",
-	"callable": "TYPE_CALLABLE",
-	"signal": "TYPE_SIGNAL",
-	"array": "TYPE_ARRAY",
-	"dict": "TYPE_DICTIONARY",
-	"dictionary": "TYPE_DICTIONARY",
-	"variant": "TYPE_NIL"
-}
-
-## Map from scdef type names to GDScript type annotations
-const GD_TYPE_MAP: Dictionary[String, String] = {
-	"float": "float",
-	"int": "int",
-	"bool": "bool",
-	"string": "String",
-	"vector2": "Vector2",
-	"vector2i": "Vector2i",
-	"vector3": "Vector3",
-	"vector3i": "Vector3i",
-	"vector4": "Vector4",
-	"vector4i": "Vector4i",
-	"rect2": "Rect2",
-	"rect2i": "Rect2i",
-	"plane": "Plane",
-	"quaternion": "Quaternion",
-	"aabb": "AABB",
-	"basis": "Basis",
-	"transform2d": "Transform2D",
-	"transform3d": "Transform3D",
-	"projection": "Projection",
-	"color": "Color",
-	"stringname": "StringName",
-	"nodepath": "NodePath",
-	"rid": "RID",
-	"object": "Object",
-	"node": "Node",
-	"resource": "Resource",
-	"callable": "Callable",
-	"signal": "Signal",
-	"array": "Array",
-	"dict": "Dictionary",
-	"dictionary": "Dictionary",
-	"variant": "Variant"
-}
-
-
 # ------------- [Private Static Method] -------------
 ## Generates GDScript source code from given data
 static func _generate_script(
@@ -115,7 +41,7 @@ static func _generate_script(
 		for p_data in params:
 			if not p_data.comment.is_empty():
 				lines.append("\t## {0}".format([p_data.comment]))
-			var type_str: String = TYPE_MAP.get(p_data.type, "TYPE_NIL")
+			var type_str: String = StateChartConstants.TYPE_MAP.get(p_data.type, "TYPE_NIL")
 
 			var notify_map_code := "{}"
 			if not p_data.notify.is_empty():
@@ -178,12 +104,12 @@ static func _generate_script(
 		pass
 	else:
 		for p_data in params:
-			var gd_type := GD_TYPE_MAP.get(p_data.type, "Variant")
+			var gd_type := StateChartConstants.GD_TYPE_MAP.get(p_data.type, "Variant")
 			lines.append("\tvar {0}: {1}:".format([p_data.name, gd_type]))
 
 			var default_val_code := "null"
-			if p_data.type in GD_TYPE_MAP:
-				default_val_code = "_sc._make_zero({0})".format([TYPE_MAP[p_data.type]])
+			if p_data.type in StateChartConstants.GD_TYPE_MAP:
+				default_val_code = "_sc._make_zero({0})".format([StateChartConstants.TYPE_MAP[p_data.type]])
 
 			lines.append(
 				"\t\tget: return _sc.get_expression_property_ext({0}.Param.{1}, {2})".format(
@@ -340,7 +266,7 @@ static func parse_scdef(text: String, fallback_name: String = "GeneratedStateCha
 			if p_parts.size() >= 3:
 				p_type = p_parts[2].to_lower()
 
-			if not p_type in TYPE_MAP:
+			if not p_type in StateChartConstants.TYPE_MAP:
 				error_msg = "Line {0}: Unknown type '{1}'.".format([i + 1, p_type])
 				break
 
@@ -359,7 +285,7 @@ static func parse_scdef(text: String, fallback_name: String = "GeneratedStateCha
 			break
 
 	if not error_msg.is_empty():
-		DLogger.error("scdef parse error: {0}".format([error_msg]))
+		DLogger.error("scdef parse error: {0}".format([error_msg]), [], "scdef_generator")
 		return {"error": error_msg}
 
 	return {"class_name": class_name_str, "events": events, "params": params, "error": ""}

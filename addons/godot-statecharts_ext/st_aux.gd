@@ -111,3 +111,13 @@ static func split_args(flags: String) -> PackedStringArray:
 		result.append(current)
 
 	return result
+
+
+## Sanitizes a metadata key for SCXML compatibility (replaces : with __).
+static func sanitize_meta_key(key: String) -> String:
+	return key.replace(":", "__")
+
+
+## Desanitizes an SCXML metadata key (replaces __ with :).
+static func desanitize_meta_key(key: String) -> String:
+	return key.replace("__", ":")
