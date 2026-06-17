@@ -300,8 +300,32 @@ static func _check_param_internal(
 			var g_a := _find_expression_guard(dst, child_path, c.guard)
 			for g in g_a:
 				_check_expression(dst, sc, child_path, g.expression, param_def)
+			_check_state_active_guard(dst, sc, child_path, c.guard, c)
 		else:
 			_check_param_internal(dst, sc, c, child_path, param_def)
+
+
+static func _check_state_active_guard(
+	dst: PackedStringArray, sc: StateChartExt, path: String, g: Guard, context_transition: Transition
+) -> void:
+	if g is StateIsActiveGuard:
+		if g.state.is_empty():
+			dst.append("StateIsActiveGuard has empty state path at [{0}]".format([path]))
+		else:
+			var target := context_transition.get_node_or_null(g.state)
+			if target == null:
+				dst.append(
+					"StateIsActiveGuard target not found: '{1}' at [{0}]".format([path, g.state])
+				)
+			elif not target is StateChartState:
+				dst.append(
+					"StateIsActiveGuard target is not a state: '{1}' at [{0}]".format([path, g.state])
+				)
+	elif g is NotGuard:
+		_check_state_active_guard(dst, sc, path, g.guard, context_transition)
+	elif g is AllOfGuard or g is AnyOfGuard:
+		for cg in g.guards:
+			_check_state_active_guard(dst, sc, path, cg, context_transition)
 
 
 static func _check_expression(
