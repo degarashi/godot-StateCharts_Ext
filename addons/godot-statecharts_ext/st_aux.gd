@@ -73,6 +73,11 @@ static func dispatch_event(st: StateChartExt, ev: StateChartExt.EventEnt) -> voi
 	st.send_event_ext(ev)
 
 
+## Returns true if the specified state is currently active.
+static func is_state_active(st: StateChartExt, state: StateChartState) -> bool:
+	return state.active
+
+
 ## Returns all current expression properties as a dictionary.
 ## Useful for saving game state or debugging.
 static func st_get_all_params_as_dict(st: StateChartExt) -> Dictionary:
