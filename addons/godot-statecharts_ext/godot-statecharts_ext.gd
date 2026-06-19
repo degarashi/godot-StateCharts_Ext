@@ -11,7 +11,9 @@ const MENU_FORCE_REGENERATE := (
 )
 const MENU_EXPORT_SCXML := "StateChartExt: Export current StateChart as SCXML"
 const MENU_IMPORT_SCXML := "StateChartExt: Import SCXML to current StateChart"
-const MENU_CONVERT_SCXML := "StateChartExt: Convert SCXML to ." + StateChartConstants.SCDEF_EXTENSION
+const MENU_CONVERT_SCXML := (
+	"StateChartExt: Convert SCXML to ." + StateChartConstants.SCDEF_EXTENSION
+)
 
 const FileSystemContextMenuScript := preload(
 	"res://addons/godot-statecharts_ext/editor/context_menu_filesystem.gd"
@@ -19,9 +21,11 @@ const FileSystemContextMenuScript := preload(
 const SceneTreeContextMenuScript := preload(
 	"res://addons/godot-statecharts_ext/editor/context_menu_scene_tree.gd"
 )
+const FileWatcherScript := preload("res://addons/godot-statecharts_ext/util/file_watcher.gd")
 
 # ------------- [Private Variables] -------------
-var _fs_reloading := false
+var _file_watcher: DFileWatcher
+
 var _import_plugin: EditorImportPlugin
 var _scxml_import_plugin: EditorImportPlugin
 var _transition_inspector_plugin: EditorInspectorPlugin
@@ -68,10 +72,10 @@ func _enter_tree() -> void:
 	# Wait for the editor to be fully ready before registration
 	_register_inspectors_delayed()
 
-	var fs := EditorInterface.get_resource_filesystem()
-	fs.filesystem_changed.connect(_on_filesystem_changed)
-	if fs.has_signal("sources_changed"):
-		fs.sources_changed.connect(_on_sources_changed)
+	_file_watcher = FileWatcherScript.new(
+		get_tree(), _editor_manager.get_watch_files
+	)
+	_file_watcher.files_changed.connect(_on_file_watcher_files_changed)
 
 	add_tool_menu_item(MENU_FORCE_REGENERATE, _on_manual_scan_requested)
 	add_tool_menu_item(MENU_EXPORT_SCXML, _on_export_scxml_requested)
@@ -88,7 +92,7 @@ func _enter_tree() -> void:
 
 	# Wait for the filesystem to be fully loaded before initial scan
 	var timer := get_tree().create_timer(1.0)
-	timer.timeout.connect(_on_filesystem_changed)
+	timer.timeout.connect(_file_watcher.force_sync)
 
 
 func _exit_tree() -> void:
@@ -133,11 +137,9 @@ func _exit_tree() -> void:
 	remove_tool_menu_item(MENU_IMPORT_SCXML)
 	remove_tool_menu_item(MENU_CONVERT_SCXML)
 
-	var fs := EditorInterface.get_resource_filesystem()
-	if fs.filesystem_changed.is_connected(_on_filesystem_changed):
-		fs.filesystem_changed.disconnect(_on_filesystem_changed)
-	if fs.has_signal("sources_changed") and fs.sources_changed.is_connected(_on_sources_changed):
-		fs.sources_changed.disconnect(_on_sources_changed)
+	if _file_watcher:
+		_file_watcher.destroy()
+		_file_watcher = null
 
 	_editor_manager = null
 
@@ -153,18 +155,16 @@ func _edit(object: Object) -> void:
 
 
 # ------------- [Callbacks] -------------
-func _on_filesystem_changed() -> void:
-	if _fs_reloading:
-		return
-
-	_fs_reloading = true
-	_editor_manager.scan_dir_recursive("res://")
-	await get_tree().create_timer(1.0).timeout
-	_fs_reloading = false
-
-
-func _on_sources_changed(_exist: bool) -> void:
-	_on_filesystem_changed()
+func _on_file_watcher_files_changed(files: PackedStringArray) -> void:
+	if _file_watcher:
+		_file_watcher.set_syncing(true)
+	for file_path in files:
+		if file_path.ends_with("." + StateChartConstants.SCDEF_EXTENSION):
+			_process_scdef_file(file_path)
+		elif file_path.ends_with(".scxml"):
+			_editor_manager.convert_scxml_to_scdef_if_needed(file_path)
+	if _file_watcher:
+		_file_watcher.set_syncing(false)
 
 
 # ------------- [Private Methods] -------------
@@ -178,12 +178,15 @@ func _init_settings() -> void:
 	if not es.has_setting(setting_path):
 		es.set_setting(setting_path, "")
 		es.set_initial_value(setting_path, "", false)
-		es.add_property_info(
-			{
-				"name": setting_path,
-				"type": TYPE_STRING,
-				"hint": PROPERTY_HINT_GLOBAL_FILE,
-			}
+		(
+			es
+			. add_property_info(
+				{
+					"name": setting_path,
+					"type": TYPE_STRING,
+					"hint": PROPERTY_HINT_GLOBAL_FILE,
+				}
+			)
 		)
 
 
@@ -221,9 +224,7 @@ func _open_in_external_editor(path: String) -> void:
 			args = [global_path]
 
 	DLogger.debug(
-		"Attempting to open {0} with editor: {1} (args: {2})",
-		[global_path, editor_path, args],
-		CAT
+		"Attempting to open {0} with editor: {1} (args: {2})", [global_path, editor_path, args], CAT
 	)
 	var pid := OS.create_process(editor_path, args)
 	if pid == -1:

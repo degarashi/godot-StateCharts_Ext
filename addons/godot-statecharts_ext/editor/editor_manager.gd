@@ -106,9 +106,10 @@ func process_scdef_file(scdef_path: String) -> void:
 			EditorInterface.get_base_control().add_child(dialog)
 			dialog.popup_centered()
 			# Automatically queue free when closed
-			dialog.visibility_changed.connect(func():
-				if not dialog.visible:
-					dialog.queue_free()
+			dialog.visibility_changed.connect(
+				func():
+					if not dialog.visible:
+						dialog.queue_free()
 			)
 		return
 
@@ -214,3 +215,25 @@ func _on_scxml_import_file_selected(path: String) -> void:
 		var script := load(gd_path) as Script
 		if script:
 			selected_nodes[0].set_script(script)
+
+
+func get_watch_files() -> PackedStringArray:
+	var files := PackedStringArray()
+	var fs := EditorInterface.get_resource_filesystem()
+	if fs:
+		_collect_files_recursive(fs.get_filesystem(), files)
+	return files
+
+
+func _collect_files_recursive(dir: EditorFileSystemDirectory, files: PackedStringArray) -> void:
+	if not dir:
+		return
+	for i in range(dir.get_subdir_count()):
+		_collect_files_recursive(dir.get_subdir(i), files)
+	for i in range(dir.get_file_count()):
+		var file_name := dir.get_file(i)
+		if (
+			file_name.ends_with("." + StateChartConstants.SCDEF_EXTENSION)
+			or file_name.ends_with(".scxml")
+		):
+			files.append(dir.get_file_path(i))
