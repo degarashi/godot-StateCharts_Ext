@@ -376,9 +376,52 @@ static func _check_event_typo_internal(
 		var child_path := path + StateChartConstants.PATH_SEPARATOR + c.name
 		if c is Transition:
 			if not c.event.is_empty() and c.event not in events and c.event not in exclude_ev:
-				err_msg.append("Unknown event: {1}\n at [{0}]".format([child_path, c.event]))
+				var suggestion := _get_best_match(c.event, events.keys() + Array(exclude_ev))
+				if suggestion.is_empty():
+					err_msg.append("Unknown event: {1}\n at [{0}]".format([child_path, c.event]))
+				else:
+					err_msg.append("Unknown event: {1} (Did you mean: '{2}'?)\n at [{0}]".format([child_path, c.event, suggestion]))
 		else:
 			_check_event_typo_internal(err_msg, sc, c, child_path, events, exclude_ev)
+
+
+static func _get_best_match(target: String, candidates: Array) -> String:
+	var best_candidate := ""
+	var min_distance := 9999
+	for c in candidates:
+		var c_str := str(c)
+		var dist := _levenshtein_distance(target, c_str)
+		if dist < min_distance and dist <= 3:
+			min_distance = dist
+			best_candidate = c_str
+	return best_candidate
+
+
+static func _levenshtein_distance(s: String, t: String) -> int:
+	if s == t:
+		return 0
+	if s.length() == 0:
+		return t.length()
+	if t.length() == 0:
+		return s.length()
+
+	var v0: Array[int] = []
+	var v1: Array[int] = []
+	v0.resize(t.length() + 1)
+	v1.resize(t.length() + 1)
+
+	for i in range(v0.size()):
+		v0[i] = i
+
+	for i in range(s.length()):
+		v1[0] = i + 1
+		for j in range(t.length()):
+			var cost := 0 if s[i] == t[j] else 1
+			v1[j + 1] = min(v1[j] + 1, min(v0[j + 1] + 1, v0[j] + cost))
+		for j in range(v0.size()):
+			v0[j] = v1[j]
+
+	return v0[t.length()]
 
 
 static func _find_expression_guard(

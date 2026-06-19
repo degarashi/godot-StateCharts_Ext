@@ -19,7 +19,7 @@ static func _generate_script(
 	lines.append("var e: GEventProxy")
 	lines.append("var p: GParamProxy")
 	lines.append("")
-
+ 
 	# --- Event class ---
 	lines.append("class Event:")
 	lines.append("\textends StateChartExt.Event")
@@ -31,7 +31,7 @@ static func _generate_script(
 				lines.append("\t## {0}".format([ev.comment]))
 			lines.append("\tstatic var {0} := e()".format([ev.name]))
 	lines.append("")
-
+ 
 	# --- Param class ---
 	lines.append("class Param:")
 	lines.append("\textends StateChartExt.Param")
@@ -42,7 +42,7 @@ static func _generate_script(
 			if not p_data.comment.is_empty():
 				lines.append("\t## {0}".format([p_data.comment]))
 			var type_str: String = StateChartConstants.TYPE_MAP.get(p_data.type, "TYPE_NIL")
-
+ 
 			var notify_map_code := "{}"
 			if not p_data.notify.is_empty():
 				var notify_parts: Array[String] = []
@@ -52,32 +52,32 @@ static func _generate_script(
 						"{0}.Event.{1}: {2}".format([class_name_str, ev_name, str(val).to_lower()])
 					)
 				notify_map_code = "{ {0} }".format([", ".join(notify_parts)])
-
+ 
 			var init_val_code := "StateChartExt._s_none_value"
 			if not p_data.init.is_empty():
 				init_val_code = p_data.init
-
+ 
 			var local_state_code := '&""'
 			if not p_data.local_state.is_empty():
 				local_state_code = '&"{0}"'.format([p_data.local_state])
-
+ 
 			lines.append(
 				"\tstatic var {0} := p({1}, {2}, {3}, {4})".format(
 					[p_data.name, type_str, notify_map_code, init_val_code, local_state_code]
 				)
 			)
 	lines.append("")
-
+ 
 	# --- Specialized Proxies ---
 	lines.append("class GEventProxy extends StateChartExt.EventProxy:")
-
+ 
 	var event_names: Array[String] = []
 	for ev in events:
 		event_names.append('"{0}"'.format([ev.name]))
 	lines.append(
 		"\tfunc has(name: String) -> bool: return name in [{0}]".format([", ".join(event_names)])
 	)
-
+ 
 	if events.is_empty():
 		pass
 	else:
@@ -88,32 +88,40 @@ static func _generate_script(
 				)
 			)
 	lines.append("")
-
+ 
 	lines.append("class GParamProxy extends StateChartExt.ParamProxy:")
-
+ 
 	var param_names: Array[String] = []
 	for p_data in params:
 		param_names.append('"{0}"'.format([p_data.name]))
-
+ 
 	lines.append("\tfunc has(name: String) -> bool:")
 	lines.append("\t\tif not name in [{0}]: return false".format([", ".join(param_names)]))
 	lines.append("\t\treturn _sc._expression_properties.has(name)")
 	lines.append("")
-
+ 
 	if params.is_empty():
 		pass
 	else:
 		for p_data in params:
 			var gd_type := StateChartConstants.GD_TYPE_MAP.get(p_data.type, "Variant")
 			lines.append("\tvar {0}: {1}:".format([p_data.name, gd_type]))
-
+ 
 			var default_val_code := "null"
 			if p_data.type in StateChartConstants.GD_TYPE_MAP:
 				default_val_code = "_sc._make_zero({0})".format([StateChartConstants.TYPE_MAP[p_data.type]])
+ 
+			# In GDScript, casting Variant to strict static types via `as Type` is preferred for type safety.
+			# Variant/Objects might not be castable directly with `as` unless they are Classes, 
+			# but basic types like float/int/bool/String are directly castable. 
+			# Object-based types can also use `as Object` etc.
+			var cast_expr := ""
+			if gd_type != "Variant":
+				cast_expr = " as {0}".format([gd_type])
 
 			lines.append(
-				"\t\tget: return _sc.get_expression_property_ext({0}.Param.{1}, {2})".format(
-					[class_name_str, p_data.name, default_val_code]
+				"\t\tget: return _sc.get_expression_property_ext({0}.Param.{1}, {2}){3}".format(
+					[class_name_str, p_data.name, default_val_code, cast_expr]
 				)
 			)
 			lines.append(
@@ -122,18 +130,18 @@ static func _generate_script(
 				)
 			)
 	lines.append("")
-
+ 
 	# --- _init ---
 	lines.append("func _init() -> void:")
 	lines.append("\te = GEventProxy.new(self)")
 	lines.append("\tp = GParamProxy.new(self)")
 	lines.append("")
-
+ 
 	# --- get_sc_info ---
 	lines.append("# [Override]")
 	lines.append("func get_sc_info() -> SCInfo:")
 	lines.append("\treturn SCInfo.new(Param, Event)")
-
+ 
 	return "\n".join(lines)
 
 

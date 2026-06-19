@@ -51,7 +51,7 @@ static func st_add_array(
 ## Adds a value to a parameter and returns an array of [previous_value, new_value].
 static func st_add_value(
 	st: StateChartExt, param_ent: StateChartExt.ParamEnt, value_to_add: Variant
-) -> Array:
+) -> Array[Variant]:
 	var orig: Variant = st.get_expression_property_ext(param_ent)
 	var after: Variant = orig + value_to_add
 	st.set_expression_property_ext(param_ent, after)

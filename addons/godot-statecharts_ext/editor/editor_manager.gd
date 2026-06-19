@@ -97,7 +97,19 @@ func process_scdef_file(scdef_path: String) -> void:
 	var result := StateChartGenerator.parse_and_generate(content, fallback_name)
 
 	if not result.error.is_empty():
-		DLogger.error("Syntax error in {0}:\n{1}", [scdef_path, result.error], CAT)
+		var err_msg: String = "Syntax error in {0}:\n{1}".format([scdef_path, result.error])
+		DLogger.error("{0}", [err_msg], CAT)
+		if Engine.is_editor_hint():
+			var dialog := AcceptDialog.new()
+			dialog.title = "StateChartExt Compile Error"
+			dialog.dialog_text = err_msg
+			EditorInterface.get_base_control().add_child(dialog)
+			dialog.popup_centered()
+			# Automatically queue free when closed
+			dialog.visibility_changed.connect(func():
+				if not dialog.visible:
+					dialog.queue_free()
+			)
 		return
 
 	if result.code != old_content:
