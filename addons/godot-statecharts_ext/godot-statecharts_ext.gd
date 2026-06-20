@@ -21,8 +21,7 @@ const FileSystemContextMenuScript := preload(
 const SceneTreeContextMenuScript := preload(
 	"res://addons/godot-statecharts_ext/editor/context_menu_scene_tree.gd"
 )
-const FileWatcherScript := preload("res://addons/godot-statecharts_ext/util/file_watcher.gd")
-const DFileWatcher = preload("uid://c6ftnvehqfjt4")
+const DFileWatcher = preload("res://addons/godot-statecharts_ext/util/file_watcher.gd")
 
 # ------------- [Private Variables] -------------
 var _file_watcher: DFileWatcher
@@ -73,7 +72,7 @@ func _enter_tree() -> void:
 	# Wait for the editor to be fully ready before registration
 	_register_inspectors_delayed()
 
-	_file_watcher = FileWatcherScript.new(
+	_file_watcher = DFileWatcher.new(
 		get_tree(), _editor_manager.get_watch_files
 	)
 	_file_watcher.files_changed.connect(_on_file_watcher_files_changed)
