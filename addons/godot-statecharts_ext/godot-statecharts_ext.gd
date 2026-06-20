@@ -22,6 +22,7 @@ const SceneTreeContextMenuScript := preload(
 	"res://addons/godot-statecharts_ext/editor/context_menu_scene_tree.gd"
 )
 const FileWatcherScript := preload("res://addons/godot-statecharts_ext/util/file_watcher.gd")
+const DFileWatcher = preload("uid://c6ftnvehqfjt4")
 
 # ------------- [Private Variables] -------------
 var _file_watcher: DFileWatcher
