@@ -373,7 +373,12 @@ func _export_transitions(state_node: Node, lines: Array[String], indent: int) ->
 		var events: Array[String] = group.events
 		var attrs: Array[String] = []
 
-		var delay_str := String(key.delay).strip_edges().replace(" ", "")
+		var delay_str := str(key.delay).strip_edges().replace(" ", "")
+
+		# Convert seconds to milliseconds for numeric delay values
+		if delay_str.is_valid_float():
+			delay_str = str(int(round(float(delay_str) * 1000.0)))
+
 		var exported_events: Array[String] = []
 
 		if events.is_empty():

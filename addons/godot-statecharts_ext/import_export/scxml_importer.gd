@@ -528,6 +528,9 @@ func _parse_state_element(
 							# If trans_delay is default, use the one from the event name
 							if final_delay == "0.0" or final_delay == "":
 								final_delay = parts[1]
+							# Interpret integer delay as milliseconds, convert to seconds
+							if final_delay.is_valid_int():
+								final_delay = str(float(int(final_delay)) / 1000.0)
 
 						var trans_name := trans_name_attr
 						if trans_name.is_empty():
