@@ -193,13 +193,13 @@ func _on_scxml_export_file_selected(path: String) -> void:
 		DLogger.info("SCXML exported to: {0}", [path], CAT)
 
 
-func _on_scxml_import_file_selected(path: String) -> void:
-	var selected_nodes := EditorInterface.get_selection().get_selected_nodes()
-	if selected_nodes.is_empty() or not selected_nodes[0] is StateChartExt:
+func import_scxml_to_node(scxml_path: String, target_node: Node) -> void:
+	if not target_node is StateChartExt:
+		DLogger.warn("Target node must be a StateChartExt.", [], CAT)
 		return
 
-	var scdef_path := path.get_basename() + "." + StateChartConstants.SCDEF_EXTENSION
-	var scdef_content := StateChartScxmlImporter.generate_scdef(path)
+	var scdef_path := scxml_path.get_basename() + "." + StateChartConstants.SCDEF_EXTENSION
+	var scdef_content := StateChartScxmlImporter.generate_scdef(scxml_path)
 	if not scdef_content.is_empty():
 		var f_scdef := FileAccess.open(scdef_path, FileAccess.WRITE)
 		if f_scdef:
@@ -209,12 +209,19 @@ func _on_scxml_import_file_selected(path: String) -> void:
 			process_scdef_file(scdef_path)
 
 	var importer := StateChartScxmlImporter.new()
-	var err := importer.import_scxml(path, selected_nodes[0])
+	var err := importer.import_scxml(scxml_path, target_node)
 	if err == OK:
 		var gd_path := scdef_path.get_basename() + "." + StateChartConstants.GD_EXTENSION
 		var script := load(gd_path) as Script
 		if script:
-			selected_nodes[0].set_script(script)
+			target_node.set_script(script)
+
+
+func _on_scxml_import_file_selected(path: String) -> void:
+	var selected_nodes := EditorInterface.get_selection().get_selected_nodes()
+	if selected_nodes.is_empty() or not selected_nodes[0] is StateChartExt:
+		return
+	import_scxml_to_node(path, selected_nodes[0])
 
 
 func get_watch_files() -> PackedStringArray:

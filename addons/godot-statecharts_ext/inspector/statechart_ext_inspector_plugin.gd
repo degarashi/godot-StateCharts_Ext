@@ -2,6 +2,7 @@
 extends EditorInspectorPlugin
 
 const StateChartExtScript := preload("uid://bjud7klva0cit")
+const SCXMLDropZoneScript := preload("res://addons/godot-statecharts_ext/inspector/scxml_drop_zone.gd")
 
 var _plugin: EditorPlugin
 
@@ -39,3 +40,7 @@ func _parse_begin(object: Object) -> void:
 		)
 		btn_reimport.pressed.connect(object.reimport_scxml)
 		add_custom_control(btn_reimport)
+
+	var drop_zone := SCXMLDropZoneScript.new()
+	drop_zone.setup(object, _plugin)
+	add_custom_control(drop_zone)

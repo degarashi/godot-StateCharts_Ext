@@ -241,6 +241,10 @@ func _on_export_scxml_requested() -> void:
 	_editor_manager.request_export_scxml()
 
 
+func import_scxml_to_node(scxml_path: String, target_node: Node) -> void:
+	_editor_manager.import_scxml_to_node(scxml_path, target_node)
+
+
 func _on_import_scxml_requested() -> void:
 	_editor_manager.request_import_scxml()
 
