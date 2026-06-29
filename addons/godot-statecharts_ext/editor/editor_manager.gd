@@ -67,7 +67,7 @@ func convert_scxml_to_scdef_if_needed(scxml_path: String) -> void:
 			f.store_string(scdef_content)
 			f.close()
 			DLogger.info("Auto-generated .scdef from .scxml: {0}", [scdef_path], CAT)
-			EditorInterface.get_resource_filesystem().update_file(scdef_path)
+			_create_scdef_import_files(scdef_path)
 			process_scdef_file(scdef_path)
 
 
@@ -177,7 +177,7 @@ func on_scxml_convert_file_selected(path: String) -> void:
 			f.store_string(scdef_content)
 			f.close()
 			DLogger.info("Generated .scdef: {0}", [scdef_path], CAT)
-			EditorInterface.get_resource_filesystem().update_file(scdef_path)
+			_create_scdef_import_files(scdef_path)
 			process_scdef_file(scdef_path)
 			EditorInterface.select_file(scdef_path)
 
@@ -192,6 +192,88 @@ func _on_scxml_export_file_selected(path: String) -> void:
 	if err == OK:
 		DLogger.info("SCXML exported to: {0}", [path], CAT)
 
+		_create_scxml_import_files(path)
+		call_deferred("_on_scxml_export_complete", path)
+
+
+func _create_scxml_import_files(source_path: String) -> void:
+	# .godot/imported ディレクトリを確保
+	var dir := DirAccess.open("res://")
+	if dir:
+		dir.make_dir_recursive(".godot/imported")
+
+	# キャッシュパスを計算 (Godot の EditorFileSystem._get_cache_path 相当)
+	var file := source_path.get_file()
+	var md5 := source_path.md5_text()
+	var cache_path := "res://.godot/imported/%s-%s.res" % [file, md5]
+
+	# .res を直接生成 (非同期インポートを待たずに開ける)
+	var res := StateChartSCXML.new()
+	var f := FileAccess.open(source_path, FileAccess.READ)
+	if f:
+		res.source_code = f.get_as_text()
+		f.close()
+	ResourceSaver.save(res, cache_path)
+
+	# .import ファイルを生成
+	var import_path := source_path + ".import"
+	var content := "[remap]\n\n"
+	content += "importer=\"statechart_ext_scxml\"\n"
+	content += "type=\"Resource\"\n"
+	content += "path=\"%s\"\n\n" % cache_path
+	content += "[deps]\n\n"
+	content += "source_file=\"%s\"\n" % source_path
+	content += "dest_files=[\"%s\"]\n\n" % cache_path
+	content += "[params]\n"
+	var fi := FileAccess.open(import_path, FileAccess.WRITE)
+	if fi:
+		fi.store_string(content)
+		fi.close()
+
+	EditorInterface.get_resource_filesystem().update_file(source_path)
+
+
+func _create_scdef_import_files(source_path: String) -> void:
+	# .godot/imported ディレクトリを確保
+	var dir := DirAccess.open("res://")
+	if dir:
+		dir.make_dir_recursive(".godot/imported")
+
+	# キャッシュパスを計算
+	var file := source_path.get_file()
+	var md5 := source_path.md5_text()
+	var cache_path := "res://.godot/imported/%s-%s.res" % [file, md5]
+
+	# .res を直接生成 (非同期インポートを待たずに開ける)
+	var res := StateChartDefinition.new()
+	var f := FileAccess.open(source_path, FileAccess.READ)
+	if f:
+		res.source_code = f.get_as_text()
+		f.close()
+	ResourceSaver.save(res, cache_path)
+
+	# .import ファイルを生成
+	var import_path := source_path + ".import"
+	var content := "[remap]\n\n"
+	content += "importer=\"statechart_ext_scdef\"\n"
+	content += "type=\"Resource\"\n"
+	content += "path=\"%s\"\n\n" % cache_path
+	content += "[deps]\n\n"
+	content += "source_file=\"%s\"\n" % source_path
+	content += "dest_files=[\"%s\"]\n\n" % cache_path
+	content += "[params]\n"
+	var fi := FileAccess.open(import_path, FileAccess.WRITE)
+	if fi:
+		fi.store_string(content)
+		fi.close()
+
+	EditorInterface.get_resource_filesystem().update_file(source_path)
+
+
+# ファイルシステムのインポート完了後にファイルを選択する
+func _on_scxml_export_complete(path: String) -> void:
+	EditorInterface.select_file(path)
+
 
 func import_scxml_to_node(scxml_path: String, target_node: Node) -> void:
 	if not target_node is StateChartExt:
@@ -205,7 +287,7 @@ func import_scxml_to_node(scxml_path: String, target_node: Node) -> void:
 		if f_scdef:
 			f_scdef.store_string(scdef_content)
 			f_scdef.close()
-			EditorInterface.get_resource_filesystem().update_file(scdef_path)
+			_create_scdef_import_files(scdef_path)
 			process_scdef_file(scdef_path)
 
 	var importer := StateChartScxmlImporter.new()

@@ -71,8 +71,19 @@ func _import(
 				script_path = gd_class["path"]
 				break
 
+		if script_path.is_empty():
+			# Fallback for known classes in this plugin to avoid timing issues during startup
+			if _resource_type == "StateChartDefinition":
+				script_path = "res://addons/godot-statecharts_ext/statechart_definition.gd"
+			elif _resource_type == "StateChartSCXML":
+				script_path = "res://addons/godot-statecharts_ext/statechart_scxml.gd"
+
 		if not script_path.is_empty():
-			res.set_script(load(script_path))
+			var script = load(script_path)
+			if script == null:
+				printerr("[ScExt_Import] Failed to load script: ", script_path)
+			else:
+				res.set_script(script)
 		elif ClassDB.can_instantiate(_resource_type):
 			# If it's a built-in type, we can't just set_script, so we replace res
 			res = ClassDB.instantiate(_resource_type)
@@ -80,4 +91,8 @@ func _import(
 	if res.get_script() and "source_code" in res:
 		res.source_code = FileAccess.get_file_as_string(source_file)
 
-	return ResourceSaver.save(res, "%s.%s" % [save_path, _get_save_extension()])
+	var output_path := "%s.%s" % [save_path, _get_save_extension()]
+	var err := ResourceSaver.save(res, output_path)
+	if err != OK:
+		printerr("[ScExt_Import] Failed to save resource to ", output_path, ", error code: ", err)
+	return err

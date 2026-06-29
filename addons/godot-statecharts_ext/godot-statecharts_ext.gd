@@ -55,7 +55,9 @@ func _enter_tree() -> void:
 	)
 	_st_icon_manager = STIconManager.new(self)
 
-	var DummyImportPlugin := preload("uid://b70108gychlte")
+	var DummyImportPlugin := preload(
+		"res://addons/godot-statecharts_ext/import_export/dummy_import_plugin.gd"
+	)
 	_import_plugin = DummyImportPlugin.new(
 		"statechart_ext_scdef",
 		"StateChart Definition",
@@ -278,10 +280,14 @@ func _register_inspectors_delayed() -> void:
 		remove_inspector_plugin(_dummy_resource_inspector_plugin)
 		_dummy_resource_inspector_plugin = null
 
-	_transition_inspector_plugin = preload("uid://c2pho7wt7vtg4").new()
+	_transition_inspector_plugin = preload(
+		"res://addons/godot-statecharts_ext/inspector/transition_inspector_plugin.gd"
+	).new()
 	add_inspector_plugin(_transition_inspector_plugin)
 
-	_statechart_ext_inspector_plugin = preload("uid://b3tq0e06y60t3").new(self)
+	_statechart_ext_inspector_plugin = preload(
+		"res://addons/godot-statecharts_ext/inspector/statechart_ext_inspector_plugin.gd"
+	).new(self)
 	add_inspector_plugin(_statechart_ext_inspector_plugin)
 
 	var DummyResourceInspectorPlugin := preload(
