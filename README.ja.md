@@ -5,45 +5,56 @@
 
 ## 特徴
 
-- **静的な型安全性**: `.scdef` ファイルから GDScript のボイラープレートを自動生成する。生成されたコードには明示的なメンバが含まれるため、IDE の補完機能を最大限に活用できる。
+- **静的な型安全性**: `.scdef` ファイルから型付けされた GDScript ボイラープレートを自動生成する。IDE の補完機能を最大限に活用できる。
 - **プロキシベースの API**: 
-    - `sc.e.event_name.call()`: 定義したイベント名で直感的にイベントを送信できる。
-    - `sc.p.param_name = value`: パラメータへの直接アクセスと代入が可能。内部で自動的な型チェックが行われる。
-- **自動通知機能**: パラメータの値が変更された際に、自動的に特定のイベントをトリガーするように設定できる（変更検知ロジックのカスタマイズも可能）。
-- **ステート・ローカルパラメータ**: 特定のステートがアクティブな間だけ存在するパラメータを管理できる。ステート進入時に自動初期化され、退出時に自動クリーンアップされる。
-- **初期値のサポート**: 定義ファイルでパラメータの初期値を指定できる。
+    - `sc.e.jump.call()`: イベントを直感的に送信。
+    - `sc.p.health = 90.0`: パラメータに直接アクセス・代入。型チェック付き。
+- **自動通知機能**: パラメータ変更時にイベントを自動トリガー（変更検知ロジックは bool または Callable でカスタマイズ可能）。
+- **ステート・ローカルパラメータ**: 特定ステートがアクティブな間だけ存在するパラメータ。自動初期化・クリーンアップ。
 - **エディタ統合**: 
-    - **設定警告 (Configuration Warnings)**: イベント名、パラメータ型、エクスプレッションの構文などをリアルタイムでバリデーションする。
-    - **インスペクタ統合**: StateChart のパラメータを Godot のインスペクタ上の `p/` グループから直接確認・編集できる。
-    - **遷移イベントのドロップダウン選択**: `Transition` ノードのインスペクタ上の `event` プロパティにおいて、定義されたイベントが自動的にドロップダウン形式で選択可能になる。
-    - **エラーチェックボタン**: インスペクタ上のボタンから、手動でバリデーションをトリガーできる。
-- **デバッグツール**: ステート遷移ログ (`debug_log`) やイベント受信ログ (`debug_event`) をトグルで切り替え可能。
+    - **設定警告**: イベント名、パラメータ型、ガード式、重複トランジション、重複ステート名、未使用イベント/パラメータ、不正な並列遷移などをリアルタイム検証。
+    - **インスペクタパラメータ**: `p/` グループから直接編集。ローカルパラメータは `[L: Move] speed` のように表示。
+    - **遷移イベントドロップダウン**: `Transition` ノードの `event` プロパティに定義済みイベントが自動表示。
+    - **SCXML コントロール**: インスペクタに Export/Import/Re-import ボタンとドラッグ＆ドロップゾーン。
+    - **エラーチェック / メタデータクリア**: ボタン一つで全検証 or メタデータ削除。
+    - **除外設定（イベント個別）**: 未使用イベント警告・不明イベント警告をイベント単位で除外可能。
+    - **ファイルシステムアイコン**: `.scdef` / `.scxml` ファイルにカスタムアイコン。
+    - **シーンツリーアイコン**: ステートのシグナル接続状態をバッジ表示。クリックでコードへジャンプ。
+    - **コンテキストメニュー**: ファイルシステムで右クリック → SCXML変換/GDScript再生成。シーンツリーで右クリック → SCXML エクスポート/インポート/scdef を開く。
+    - **外部エディタ**: `.scdef` は Godot 設定の外部テキストエディタで、`.scxml` は専用エディタパス設定で開く。
+- **ランタイム可視化**: `runtime_visualization` でアクティブなステート名を画面上にオーバーレイ表示。
+- **ランタイム履歴**: ステート遷移の履歴をタイムスタンプ付きで記録（インスペクタで表示）。
+- **デバッグツール**: ステート遷移ログ (`debug_log`) とイベント受信ログ (`debug_event`) をトグル可能。
 
 ## SCXML 連携
 
-このプラグインは、Qt Creator などの外部エディタとのシームレスな連携を可能にする、プロフェッショナルグレードの SCXML インポート/エクスポート機能を提供している。
+本格的な SCXML インポート/エクスポート（Qt Creator 等とのラウンドトリップ対応）。
 
-- **高度なラウンドトリップ**: メタデータ（`qt:editorinfo` など）、カスタム属性、および名前空間付きタグが完全に保持される。
-- **History（履歴）ステート**: SCXML の `<history>` タグ（`shallow` および `deep`）を Godot の `HistoryState` ノードにマッピング。
-- **高度な遷移ハンドリング**:
-    *   **複数イベント**: インポート時にスペース区切りのイベントを複数のノードに自動分割し、エクスポート時に同一設定の遷移を 1 つの要素に再統合する。
-    *   **わかりやすい自動命名**: 名前が指定されていない遷移に対して、イベント名とターゲット名から読みやすいノード名（例: `JumpToAirborne`）を自動生成する。
-- **カスタム名前空間**: 全ての `xmlns` 宣言をキャプチャして復元するため、あらゆるサードパーティツールの拡張データを壊さずに保持できる。
+- **高度なラウンドトリップ**: メタデータ、カスタム属性、名前空間付きタグ（`qt:editorinfo` 等）、ステート UID を完全保存。
+- **History ステート**: `<history>` タグ (`shallow`/`deep`) → `HistoryState`。
+- **ガード条件**: `cond` 属性を構文解析し、複合ガード木（In, &&, ||, !, 式）に変換。エクスポート時も復元。
+- **Entry/Exit アクション**: `<onentry>`/`<onexit>` 内の `<send>` / `<assign>` を保持。
+- **イベント遅延**: `event@delay` 構文（例: `shoot@500` = 500ms 遅延）。
+- **複数イベント**: スペース区切りのイベントを個別の Transition ノードに分割。エクスポート時に同一設定の遷移を統合。
+- **自動命名**: 名前未指定の遷移に `JumpToAirborne` のような自動命名。
+- **カスタム名前空間**: 全ての `xmlns` 宣言をキャプチャ・復元。
+- **.scdef 自動生成**: SCXML インポート時に対応する `.scdef` / `.gd` を自動生成。
+- **接続保存**: ユーザーのシグナル接続を UID ベースで保存・復元。
 
 
 ## インストール方法
 
 - [godot-statecharts](https://github.com/derkork/godot-statecharts) がプロジェクトにインストールされ、有効化されていることを確認する。
 - `addons/godot-statecharts_ext` フォルダをプロジェクトの `addons/` ディレクトリにコピーする。
-- **プロジェクト設定 > プラグイン** から "Godot StateCharts Extension" を有効にする。
+- **プロジェクト設定 > プラグイン** で有効化する。
 
 ## 使い方ガイド
 
 ### StateChart の定義 (.scdef)
 
-`.scdef` ファイルを使用して、ステートチャートのインターフェースを定義する。ドキュメントコメント (`##`) は生成されたコードにも引き継がれる。
+`.scdef` ファイルでステートチャートのインターフェースを定義する。ドキュメントコメント (`##`) は生成コードに引き継がれる。
 
-`player.scdef` という名前でファイルを作成する：
+`player.scdef`:
 ```text
 class PlayerSC
 
@@ -55,42 +66,43 @@ event health_changed
 # 初期値 100.0、値が実際に変更された時のみ health_changed をトリガー
 param health float = 100.0 { health_changed: true }
 
-# ステート "Move" の間だけ存在し、かつ変更時に speed_changed をトリガーする
+# ステート "Move" の間だけ存在し、変更時に speed_changed をトリガー
 param speed float = 5.0 { local: Move, speed_changed: true }
 
 param ammo int = 10
 param items array = []
 param stats dict = {}
 event speed_changed
-
 ```
 
-このファイルを保存すると、プラグインが自動的に `player.gd` を生成・更新する。
+保存すると自動的に `player.gd` が生成される。
+
+### サポートされる型
+
+`float`, `int`, `bool`, `string`, `vector2`, `vector2i`, `vector3`, `vector3i`, `vector4`, `vector4i`, `rect2`, `rect2i`, `plane`, `quaternion`, `aabb`, `basis`, `transform2d`, `transform3d`, `projection`, `color`, `stringname`, `nodepath`, `rid`, `object`, `callable`, `signal`, `array`, `dict`, `dictionary`, `variant`。
 
 ### ノードの配置と設定
 
-> 生成されたスクリプト（例: `player.gd`）をシーン内のノードにアタッチする（標準の `StateChart` ノードの代わりに使用する）。
-> インスペクタから、`Debug Log` や `Debug Event` を有効にしてデバッグに役立てることができる。
-> 未使用のイベント警告を無視したい場合は `Exclude Unused Event` リストを、未知のイベント警告を無視したい場合は `Exclude Warn Unknown Events` リストを使用する。
+生成されたスクリプト（例: `player.gd`）をノードにアタッチする（`StateChart` ノードの代わりに使用）。
+
+インスペクタで設定可能な項目:
+- **Debug Log / Debug Event**: 遷移ログ / イベントログの切り替え。
+- **Runtime Visualization**: アクティブなステートを画面上に表示。
+- **Exclude Unused / Unknown Event Warnings**: イベント単位で警告除外。
+- **Check Errors / Clear All Metadata**: 検証ボタン / メタデータ一括削除。
+- **Export/Import SCXML**: ボタンとドラッグ＆ドロップゾーン。
+- **p/ グループ**: パラメータの直接編集。
 
 ### コードからのアクセス
-
-生成された `e` (events) と `p` (parameters) プロキシを使用することで、快適なコーディングが可能になる。
 
 ```gdscript
 @onready var sc: PlayerSC = $StateChart
 
 func _ready():
-    # パラメータは自動的に初期化される
     print(sc.p.health) # 100.0
-    
-    # パラメータの設定（自動通知がトリガーされる）
-    sc.p.health = 90.0
-    
-    # イベントはメソッドとして呼び出す
+    sc.p.health = 90.0    # health_changed がトリガーされる
     sc.e.jump.call()
 
-    # パラメータの存在チェック（ローカルパラメータなどに便利）
     if sc.p.has("speed"):
         print(sc.p.speed)
 
@@ -102,20 +114,22 @@ func take_damage(amount: float):
 
 ### ローカルパラメータ
 
-`.scdef` で `{ local: StateName }` を指定した場合、そのステートに進入した際に**自動的に**パラメータが登録され、ステートを抜ける際に自動的に削除される。
+`param speed float = 5.0 { local: Move, speed_changed: true }` — `Move` ステート進入時に自動登録、退出時に自動削除。
 
-また、`local()` ヘルパーを使用して、アドホックにローカルパラメータを管理することもできる：
+アドホックなローカルパラメータ:
 ```gdscript
-# 現在のアクティブなステートを抜ける際、自動的に削除される
 sc.local().set_param(PlayerSC.Param.speed, 10.0)
+# 現在のアクティブステート退出時に自動消滅
 ```
+
+### イベント遅延
+
+SCXML の `event@delay_ms` 構文で遅延指定可能。コード上では `Transition.delay_in_seconds` で設定。
 
 ## ユーティリティ (STAux)
 
-`STAux` クラスは、一般的なタスクのための追加のヘルパーを提供する。
-
 ```gdscript
-# 複数のシグナルをイベントに一括でバインドする
+# 複数シグナルをイベントに一括バインド
 STAux.bind_signals_to_events(sc, {
     button.pressed: PlayerSC.Event.jump,
     timer.timeout: PlayerSC.Event.crouch
@@ -124,11 +138,18 @@ STAux.bind_signals_to_events(sc, {
 # 型安全なコレクション操作
 STAux.st_add_array(sc, PlayerSC.Param.items, "Sword")
 STAux.st_insert_dict(sc, PlayerSC.Param.stats, "strength", 10)
+STAux.st_init_dict(sc, PlayerSC.Param.stats)
+STAux.st_init_array(sc, PlayerSC.Param.items)
+STAux.st_add_value(sc, PlayerSC.Param.health, -10.0) # [prev, new] を返す
+
+# ステートアクティブ状態の確認
+STAux.is_state_active(sc, $MoveState)
+
+# 全パラメータのスナップショット（セーブ/デバッグ用）
+var snapshot := STAux.st_get_all_params_as_dict(sc)
 ```
 
 ## アドバンス：手動での定義
-
-`.scdef` を使用したくない場合は、手動で `StateChartExt` を継承して定義することも可能である。
 
 ```gdscript
 @tool
@@ -140,11 +161,10 @@ class Event:
 
 class Param:
     extends StateChartExt.Param
-    # p(type, notify_map, initial_value, local_state_name)
     static var health := p(TYPE_FLOAT, { MySC.Event.health_changed: true }, 100.0)
 
 func get_sc_info() -> SCInfo:
-	return SCInfo.new(Param, Event)
+    return SCInfo.new(Param, Event)
 ```
 
 ## ライセンス
