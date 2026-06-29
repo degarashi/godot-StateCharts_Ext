@@ -28,7 +28,7 @@ func _get_plugin_icon() -> Texture2D:
 	return preload("res://addons/godot-statecharts_ext/icons/statechart_ext.svg")
 
 
-## FileSystemタブ等で特定のパスに対して表示するアイコンを制御する
+## Controls the icon displayed for specific paths in the FileSystem dock.
 func _get_export_icon_for_path(path: String) -> Texture2D:
 	if path.ends_with(".scdef") or path.ends_with(".scxml"):
 		return preload("res://addons/godot-statecharts_ext/icons/statechart_ext.svg")

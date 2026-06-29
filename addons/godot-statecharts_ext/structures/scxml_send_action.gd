@@ -23,10 +23,10 @@ func _init(data: Dictionary) -> void:
 
 func execute(sc: StateChartExt) -> void:
 	if params is Array:
-		# パラメータリストを反復処理し、各パラメータの値を評価して割り当てる
+		# Iterate over the parameter list, evaluate and assign each parameter's value
 		for p_data in params:
 			if p_data is Dictionary:
-				# パラメータ名と評価式を取得し、ステートチャートのプロパティを更新する
+				# Get the parameter name and expression, then update the statechart property
 				var p_name: String = p_data.get(Key.NAME, "")
 				var expr_str: String = p_data.get(Key.EVAL_EXPR, p_data.get(Key.EXPR, ""))
 				if not p_name.is_empty():

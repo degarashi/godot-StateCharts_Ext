@@ -263,7 +263,7 @@ func _process_item_recursive(item: TreeItem) -> void:
 
 
 func _update_item_icons(item: TreeItem, node: Node) -> void:
-	# 既存の拡張アイコンをクリア
+	# Clear existing extension icons
 	for i in range(item.get_button_count(0) - 1, -1, -1):
 		var id := item.get_button_id(0, i)
 		if id >= BUTTON_ID_BASE and id <= BUTTON_ID_PHYSICS:

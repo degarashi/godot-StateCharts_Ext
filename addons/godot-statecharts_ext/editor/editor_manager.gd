@@ -197,17 +197,17 @@ func _on_scxml_export_file_selected(path: String) -> void:
 
 
 func _create_scxml_import_files(source_path: String) -> void:
-	# .godot/imported ディレクトリを確保
+	# Ensure .godot/imported directory exists
 	var dir := DirAccess.open("res://")
 	if dir:
 		dir.make_dir_recursive(".godot/imported")
 
-	# キャッシュパスを計算 (Godot の EditorFileSystem._get_cache_path 相当)
+	# Compute cache path (equivalent to Godot's EditorFileSystem._get_cache_path)
 	var file := source_path.get_file()
 	var md5 := source_path.md5_text()
 	var cache_path := "res://.godot/imported/%s-%s.res" % [file, md5]
 
-	# .res を直接生成 (非同期インポートを待たずに開ける)
+	# Generate .res directly (avoids waiting for async import)
 	var res := StateChartSCXML.new()
 	var f := FileAccess.open(source_path, FileAccess.READ)
 	if f:
@@ -215,7 +215,7 @@ func _create_scxml_import_files(source_path: String) -> void:
 		f.close()
 	ResourceSaver.save(res, cache_path)
 
-	# .import ファイルを生成
+	# Generate .import file
 	var import_path := source_path + ".import"
 	var content := "[remap]\n\n"
 	content += "importer=\"statechart_ext_scxml\"\n"
@@ -234,17 +234,17 @@ func _create_scxml_import_files(source_path: String) -> void:
 
 
 func _create_scdef_import_files(source_path: String) -> void:
-	# .godot/imported ディレクトリを確保
+	# Ensure .godot/imported directory exists
 	var dir := DirAccess.open("res://")
 	if dir:
 		dir.make_dir_recursive(".godot/imported")
 
-	# キャッシュパスを計算
+	# Compute cache path
 	var file := source_path.get_file()
 	var md5 := source_path.md5_text()
 	var cache_path := "res://.godot/imported/%s-%s.res" % [file, md5]
 
-	# .res を直接生成 (非同期インポートを待たずに開ける)
+	# Generate .res directly (avoids waiting for async import)
 	var res := StateChartDefinition.new()
 	var f := FileAccess.open(source_path, FileAccess.READ)
 	if f:
@@ -252,7 +252,7 @@ func _create_scdef_import_files(source_path: String) -> void:
 		f.close()
 	ResourceSaver.save(res, cache_path)
 
-	# .import ファイルを生成
+	# Generate .import file
 	var import_path := source_path + ".import"
 	var content := "[remap]\n\n"
 	content += "importer=\"statechart_ext_scdef\"\n"
@@ -270,7 +270,7 @@ func _create_scdef_import_files(source_path: String) -> void:
 	EditorInterface.get_resource_filesystem().update_file(source_path)
 
 
-# ファイルシステムのインポート完了後にファイルを選択する
+# Select the file in the filesystem after import completes
 func _on_scxml_export_complete(path: String) -> void:
 	EditorInterface.select_file(path)
 
